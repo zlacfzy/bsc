@@ -403,17 +403,17 @@ func (dl *diffLayer) flatten() snapshot {
 	// Parent is a diff, flatten it first (note, apart from weird corned cases,
 	// flatten will realistically only ever merge 1 layer, so there's no need to
 	// be smarter about grouping flattens together).
-	log.Debug("snapshot flatten: recurse into parent", "child", dl.root, "parent", parent.root)
+	log.Info("snapshot flatten: recurse into parent", "child", dl.root, "parent", parent.root)
 	parent = parent.flatten().(*diffLayer)
 
-	log.Debug("snapshot flatten: merging into parent", "child", dl.root, "parent", parent.root)
+	log.Info("snapshot flatten: merging into parent", "child", dl.root, "parent", parent.root)
 	parent.lock.Lock()
 	defer parent.lock.Unlock()
 
 	// Before actually writing all our data to the parent, first ensure that the
 	// parent hasn't been 'corrupted' by someone else already flattening into it
 	if parent.stale.Swap(true) {
-		log.Error("snapshot flatten: parent already stale", "child", dl.root, "parent", parent.root)
+		log.Info("snapshot flatten: parent already stale", "child", dl.root, "parent", parent.root)
 		panic("parent diff layer is stale") // we've flattened into the same parent from two children, boo
 	}
 	for hash, data := range dl.accountData {
@@ -430,7 +430,7 @@ func (dl *diffLayer) flatten() snapshot {
 		maps.Copy(parent.storageData[accountHash], storage)
 	}
 	// Return the combo parent
-	log.Debug("snapshot flatten: merged", "child", dl.root, "newParentRoot", parent.parent.Root())
+	log.Info("snapshot flatten: merged", "child", dl.root, "newParentRoot", parent.parent.Root())
 	return &diffLayer{
 		parent:      parent.parent,
 		origin:      parent.origin,
