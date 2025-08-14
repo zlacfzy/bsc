@@ -1075,6 +1075,8 @@ func DoCall(ctx context.Context, b Backend, args TransactionArgs, blockNrOrHash 
 		} else if strings.Contains(derr.Error(), "not covered yet") {
 			log.Info("eth_call hit snapshot not covered yet", "root", header.Root, "block", header.Number, "to", args.To, "from", args.From, "err", derr)
 		}
+	} else {
+		log.Info("eth_call successed")
 	}
 	return res, derr
 }
