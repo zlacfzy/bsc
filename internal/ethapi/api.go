@@ -37,6 +37,7 @@ import (
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/rawdb"
 	"github.com/ethereum/go-ethereum/core/state"
+	snapshot "github.com/ethereum/go-ethereum/core/state/snapshot"
 	"github.com/ethereum/go-ethereum/core/tracing"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/core/vm"
@@ -1050,11 +1051,32 @@ func applyMessageWithEVM(ctx context.Context, evm *vm.EVM, msg *core.Message, ti
 func DoCall(ctx context.Context, b Backend, args TransactionArgs, blockNrOrHash rpc.BlockNumberOrHash, overrides *override.StateOverride, blockOverrides *override.BlockOverrides, timeout time.Duration, globalGasCap uint64) (*core.ExecutionResult, error) {
 	defer func(start time.Time) { log.Debug("Executing EVM call finished", "runtime", time.Since(start)) }(time.Now())
 
+	// Log basic eth_call context for debugging snapshot issues
+	log.Debug("eth_call begin",
+		"to", func() any {
+			if args.To != nil {
+				return args.To
+			}
+			return nil
+		}(),
+		"from", args.From,
+		"block", blockNrOrHash,
+	)
+
 	state, header, err := b.StateAndHeaderByNumberOrHash(ctx, blockNrOrHash)
 	if state == nil || err != nil {
 		return nil, err
 	}
-	return doCall(ctx, b, args, state, header, overrides, blockOverrides, timeout, globalGasCap)
+	res, derr := doCall(ctx, b, args, state, header, overrides, blockOverrides, timeout, globalGasCap)
+	if derr != nil {
+		// Surface snapshot-related errors prominently for troubleshooting
+		if errors.Is(derr, snapshot.ErrSnapshotStale) || strings.Contains(derr.Error(), "snapshot stale") {
+			log.Warn("eth_call encountered snapshot stale", "root", header.Root, "block", header.Number, "to", args.To, "from", args.From, "err", derr)
+		} else if strings.Contains(derr.Error(), "not covered yet") {
+			log.Warn("eth_call hit snapshot not covered yet", "root", header.Root, "block", header.Number, "to", args.To, "from", args.From, "err", derr)
+		}
+	}
+	return res, derr
 }
 
 // Call executes the given transaction on the state for the given block number.
