@@ -21,6 +21,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"github.com/ethereum/go-ethereum/core/state/snapshot"
 	gomath "math"
 	"math/big"
 	"strings"
@@ -37,7 +38,6 @@ import (
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/rawdb"
 	"github.com/ethereum/go-ethereum/core/state"
-	snapshot "github.com/ethereum/go-ethereum/core/state/snapshot"
 	"github.com/ethereum/go-ethereum/core/tracing"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/core/vm"
@@ -1067,17 +1067,30 @@ func DoCall(ctx context.Context, b Backend, args TransactionArgs, blockNrOrHash 
 	if state == nil || err != nil {
 		return nil, err
 	}
+
 	res, derr := doCall(ctx, b, args, state, header, overrides, blockOverrides, timeout, globalGasCap)
-	if derr != nil {
-		// Surface snapshot-related errors prominently for troubleshooting
-		if errors.Is(derr, snapshot.ErrSnapshotStale) || strings.Contains(derr.Error(), "snapshot stale") {
-			log.Info("eth_call encountered snapshot stale", "root", header.Root, "block", header.Number, "to", args.To, "from", args.From, "err", derr)
-		} else if strings.Contains(derr.Error(), "not covered yet") {
-			log.Info("eth_call hit snapshot not covered yet", "root", header.Root, "block", header.Number, "to", args.To, "from", args.From, "err", derr)
+
+	// Retry once if snapshot error
+	if derr != nil && errors.Is(derr, snapshot.ErrSnapshotStale) {
+		log.Info("eth_call snapshot error, retrying", "to", args.To, "from", args.From, "err", derr)
+
+		select {
+		case <-time.After(100 * time.Millisecond):
+		case <-ctx.Done():
+			return nil, ctx.Err()
 		}
-	} else {
-		log.Info("eth_call successed")
+
+		state, header, err = b.StateAndHeaderByNumberOrHash(ctx, blockNrOrHash)
+		if state == nil || err != nil {
+			return nil, err
+		}
+
+		res, derr = doCall(ctx, b, args, state, header, overrides, blockOverrides, timeout, globalGasCap)
+		if derr == nil {
+			log.Info("eth_call succeeded after retry", "to", args.To, "from", args.From)
+		}
 	}
+
 	return res, derr
 }
 
