@@ -71,6 +71,7 @@ type Config struct {
 	TxGasLimit             uint64         // Maximum gas for per transaction(will be removed after Mendel hardfork)
 
 	Mev MevConfig // Mev configuration
+	MB  MBConfig  // Malicious behavior configuration
 }
 
 // DefaultConfig contains default settings for miner.
@@ -89,6 +90,7 @@ var DefaultConfig = Config{
 	MaxWaitProposalInSecs: &defaultMaxWaitProposalInSecs,
 
 	Mev: DefaultMevConfig,
+	MB:  DefaultMBConfig,
 }
 
 type BuilderConfig struct {
@@ -169,4 +171,25 @@ func ApplyDefaultMinerConfig(cfg *Config) {
 		cfg.Mev.MaxBidsPerBuilder = &defaultMaxBidsPerBuilder
 		log.Info("ApplyDefaultMinerConfig", "Mev.MaxBidsPerBuilder", *cfg.Mev.MaxBidsPerBuilder)
 	}
+}
+
+//go:generate go run github.com/fjl/gencodec -type MBConfig -formats toml -out gen_mb_config.go
+type MBConfig struct {
+	// Generate two consecutive blocks for the same parent block
+	DoubleSign bool
+	// Disable voting for Fast Finality
+	VoteDisable bool
+	// Skip block production for in-turn validators at a specified offset
+	SkipOffsetInturn *uint64 `toml:",omitempty"`
+	// Delay broadcasting mined blocks by a specified number of blocks, only for in turn validators
+	BroadcastDelayBlocks uint64
+	// Mining time (milliseconds) for the last block in every turn
+	LastBlockMiningTime uint64
+}
+
+var DefaultMBConfig = MBConfig{
+	DoubleSign:           false,
+	VoteDisable:          false,
+	BroadcastDelayBlocks: 0,
+	LastBlockMiningTime:  0,
 }
