@@ -50,6 +50,7 @@ type Peer struct {
 // version.
 func NewPeer(version uint, p *p2p.Peer, rw p2p.MsgReadWriter) *Peer {
 	id := p.ID().String()
+	name := p.Name()
 	peer := &Peer{
 		id:            id,
 		knownVotes:    newKnownCache(maxKnownVotes),
@@ -59,7 +60,7 @@ func NewPeer(version uint, p *p2p.Peer, rw p2p.MsgReadWriter) *Peer {
 		Peer:          p,
 		rw:            rw,
 		version:       version,
-		logger:        log.New("peer", id[:8]),
+		logger:        log.New("peer", id[:8], "name", name),
 		term:          make(chan struct{}),
 	}
 	peer.dispatcher = NewDispatcher(peer)
