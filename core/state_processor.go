@@ -228,6 +228,21 @@ func ApplyTransactionWithEVM(msg *Message, gp *GasPool, statedb *state.StateDB, 
 	if err != nil {
 		return nil, err
 	}
+
+	if result.Err != nil {
+		log.Warn("Transaction execution failed",
+			"block", blockNumber,
+			"tx", tx.Hash(),
+			"from", msg.From,
+			"to", msg.To,
+			"nonce", msg.Nonce,
+			"value", msg.Value,
+			"gasLimit", msg.GasLimit,
+			"gasUsed", result.UsedGas,
+			"err", result.Err,
+			"returnData", common.Bytes2Hex(result.ReturnData),
+		)
+	}
 	// Update the state with pending changes.
 	var root []byte
 	if evm.ChainConfig().IsByzantium(blockNumber) {
