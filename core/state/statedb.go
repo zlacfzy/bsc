@@ -763,6 +763,15 @@ func (s *StateDB) CreateContract(addr common.Address) {
 		obj.newContract = true
 		s.journal.createContract(addr)
 	}
+	// In NoTries mode, when CREATE2 recreates a contract at an address that
+	// previously had storage (e.g., after selfdestruct in a prior block),
+	// we must mark it as destructed so GetCommittedState returns empty values
+	// instead of reading stale storage from the snapshot.
+	if s.db.NoTries() {
+		if _, exists := s.stateObjectsDestruct[addr]; !exists {
+			s.stateObjectsDestruct[addr] = obj
+		}
+	}
 }
 
 // StateForPrefetch creates a mirrored StateDB instance that shares the same
