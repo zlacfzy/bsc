@@ -199,6 +199,10 @@ func (p *StateProcessor) Process(block *types.Block, statedb *state.StateDB, cfg
 	}, nil
 }
 
+// debugTargetTxHash is the transaction hash to trace for debugging
+// Set to empty hash to disable tracing
+var debugTargetTxHash = common.HexToHash("0xe0c87e95ce103386819ec06a5e84fd8b5ea66d87f935a840d67e347ca0b41997")
+
 // ApplyTransactionWithEVM attempts to apply a transaction to the given state database
 // and uses the input parameters for its environment similar to ApplyTransaction. However,
 // this method takes an already created EVM instance as input.
@@ -212,6 +216,78 @@ func ApplyTransactionWithEVM(msg *Message, gp *GasPool, statedb *state.StateDB, 
 				elapsed := time.Since(start)
 				log.Info("LargeTX execution time", "block", blockNumber, "tx", tx.Hash(), "gasUsed", result.UsedGas, "elapsed", elapsed)
 			}
+		}()
+	}
+
+	// Debug tracing for specific transaction
+	var originalTracer *tracing.Hooks
+	if debugTargetTxHash != (common.Hash{}) && tx.Hash() == debugTargetTxHash {
+		originalTracer = evm.Config.Tracer
+		stepCount := 0
+		evm.Config.Tracer = &tracing.Hooks{
+			OnOpcode: func(pc uint64, op byte, gas, cost uint64, scope tracing.OpContext, rData []byte, depth int, vmErr error) {
+				opName := vm.OpCode(op).String()
+				errStr := ""
+				if vmErr != nil {
+					errStr = vmErr.Error()
+				}
+				// Print stack top 3 elements for context
+				stackData := scope.StackData()
+				stackStr := ""
+				stackLen := len(stackData)
+				if stackLen > 0 {
+					maxShow := 3
+					if stackLen < maxShow {
+						maxShow = stackLen
+					}
+					for i := 0; i < maxShow; i++ {
+						if i > 0 {
+							stackStr += ","
+						}
+						stackStr += stackData[stackLen-1-i].Hex()
+					}
+				}
+				log.Info("TRACE_OPCODE",
+					"step", stepCount,
+					"pc", pc,
+					"op", opName,
+					"gas", gas,
+					"cost", cost,
+					"depth", depth,
+					"stackTop", stackStr,
+					"err", errStr,
+				)
+				stepCount++
+			},
+			OnEnter: func(depth int, typ byte, from common.Address, to common.Address, input []byte, gas uint64, value *big.Int) {
+				log.Info("TRACE_ENTER",
+					"depth", depth,
+					"type", typ,
+					"from", from.Hex(),
+					"to", to.Hex(),
+					"inputLen", len(input),
+					"gas", gas,
+					"value", value,
+				)
+			},
+			OnExit: func(depth int, output []byte, gasUsed uint64, err error, reverted bool) {
+				errStr := ""
+				if err != nil {
+					errStr = err.Error()
+				}
+				log.Info("TRACE_EXIT",
+					"depth", depth,
+					"outputLen", len(output),
+					"gasUsed", gasUsed,
+					"err", errStr,
+					"reverted", reverted,
+				)
+			},
+		}
+		log.Info("TRACE_TX_START", "tx", tx.Hash().Hex(), "block", blockNumber, "from", msg.From.Hex(), "to", msg.To.Hex(), "gasLimit", msg.GasLimit)
+		defer func() {
+			evm.Config.Tracer = originalTracer
+			log.Info("TRACE_TX_END", "tx", tx.Hash().Hex())
 		}()
 	}
 
