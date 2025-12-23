@@ -763,6 +763,15 @@ func (s *StateDB) CreateContract(addr common.Address) {
 		obj.newContract = true
 		s.journal.createContract(addr)
 	}
+	// In NoTries mode, when CREATE2 recreates a contract at an address that
+	// previously had storage (e.g., after selfdestruct in a prior block),
+	// we must mark it as destructed so GetCommittedState returns empty values
+	// instead of reading stale storage from the snapshot.
+	if s.db.NoTries() {
+		if _, exists := s.stateObjectsDestruct[addr]; !exists {
+			s.stateObjectsDestruct[addr] = obj
+		}
+	}
 }
 
 // StateForPrefetch creates a mirrored StateDB instance that shares the same
@@ -1169,9 +1178,8 @@ func (s *StateDB) fastDeleteStorage(snaps *snapshot.Tree, addrHash common.Hash, 
 	if err := iter.Error(); err != nil { // error might occur during iteration
 		return nil, nil, nil, err
 	}
-	// In NoTries mode, root is always EmptyRootHash (see updateRoot()),
-	// so we skip the hash verification. The snapshot is the source of truth.
-	if !s.db.NoTries() && stack.Hash() != root {
+
+	if stack.Hash() != root {
 		return nil, nil, nil, fmt.Errorf("snapshot is not matched, exp %x, got %x", root, stack.Hash())
 	}
 	return storages, storageOrigins, nodes, nil
@@ -1288,7 +1296,7 @@ func (s *StateDB) handleDestruction(noStorageWiping bool) (map[common.Hash]*acco
 		// In NoTries mode, prev.Root is always EmptyRootHash (see updateRoot()),
 		// so we cannot rely on it to determine if storage exists.
 		// Instead, we must try to delete storage via snapshot.
-		if !s.db.NoTries() && (prev.Root == types.EmptyRootHash || s.db.TrieDB().IsVerkle()) {
+		if prev.Root == types.EmptyRootHash || s.db.TrieDB().IsVerkle() {
 			continue
 		}
 		if noStorageWiping {
