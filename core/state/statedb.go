@@ -1183,10 +1183,10 @@ func (s *StateDB) slowDeleteStorage(addr common.Address, addrHash common.Hash, r
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to open storage trie, err: %w", err)
 	}
-	// skip deleting storages for EmptyTrie
-	if _, ok := tr.(*trie.EmptyTrie); ok {
-		return nil, nil, nil, nil
-	}
+	//// skip deleting storages for EmptyTrie
+	//if _, ok := tr.(*trie.EmptyTrie); ok {
+	//	return nil, nil, nil, nil
+	//}
 	it, err := tr.NodeIterator(nil)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to open storage iterator, err: %w", err)
