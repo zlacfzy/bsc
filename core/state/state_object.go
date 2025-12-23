@@ -175,12 +175,21 @@ func (s *stateObject) getState(key common.Hash) (common.Hash, common.Hash) {
 // GetCommittedState retrieves the value associated with the specific key
 // without any mutations caused in the current execution.
 func (s *stateObject) GetCommittedState(key common.Hash) common.Hash {
+	// Debug: target address for tracing
+	debugAddr := common.HexToAddress("0x000000aC89e4A66919059f45Bf3e8d1700B42731")
+
 	// If we have a pending write or clean cached, return that
 	if value, pending := s.pendingStorage[key]; pending {
+		if s.address == debugAddr {
+			log.Info("GET_COMMITTED_STATE", "addr", s.address, "key", key, "source", "pendingStorage", "value", value)
+		}
 		return value
 	}
 
 	if value, cached := s.originStorage[key]; cached {
+		if s.address == debugAddr {
+			log.Info("GET_COMMITTED_STATE", "addr", s.address, "key", key, "source", "originStorage", "value", value)
+		}
 		return value
 	}
 
@@ -188,6 +197,9 @@ func (s *stateObject) GetCommittedState(key common.Hash) common.Hash {
 		// keep compatible with old erroneous data(https://forum.bnbchain.org/t/about-the-hertzfix/2400).
 		if readerWithCacheStats, ok := s.db.reader.(*readerWithCacheStats); ok {
 			if value, cached, err := readerWithCacheStats.readerWithCache.storage(s.address, key); err == nil && cached {
+				if s.address == debugAddr {
+					log.Info("GET_COMMITTED_STATE", "addr", s.address, "key", key, "source", "badSharedStorage", "value", value)
+				}
 				s.originStorage[key] = value
 				return value
 			}
@@ -201,6 +213,9 @@ func (s *stateObject) GetCommittedState(key common.Hash) common.Hash {
 	//      have been handles via pendingStorage above.
 	//   2) we don't have new values, and can deliver empty response back
 	if _, destructed := s.db.stateObjectsDestruct[s.address]; destructed {
+		if s.address == debugAddr {
+			log.Info("GET_COMMITTED_STATE", "addr", s.address, "key", key, "source", "destructed", "value", common.Hash{})
+		}
 		s.originStorage[key] = common.Hash{} // track the empty slot as origin value
 		return common.Hash{}
 	}
@@ -214,6 +229,10 @@ func (s *stateObject) GetCommittedState(key common.Hash) common.Hash {
 	if err != nil {
 		s.db.setError(err)
 		return common.Hash{}
+	}
+	// Debug: log value from reader
+	if s.address == debugAddr {
+		log.Info("GET_COMMITTED_STATE", "addr", s.address, "key", key, "source", "reader", "value", value)
 	}
 	if metrics.EnabledExpensive() {
 		s.db.StorageReads += time.Since(start)

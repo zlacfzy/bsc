@@ -27,6 +27,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethdb"
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/ethereum/go-ethereum/trie"
 	"github.com/ethereum/go-ethereum/trie/utils"
@@ -194,13 +195,22 @@ func (r *flatReader) Account(addr common.Address) (*types.StateAccount, error) {
 //
 // The returned storage slot might be empty if it's not existent.
 func (r *flatReader) Storage(addr common.Address, key common.Hash) (common.Hash, error) {
+	// Debug: target address for tracing
+	debugAddr := common.HexToAddress("0x000000aC89e4A66919059f45Bf3e8d1700B42731")
+
 	addrHash := crypto.Keccak256Hash(addr.Bytes())
 	slotHash := crypto.Keccak256Hash(key.Bytes())
 	ret, err := r.reader.Storage(addrHash, slotHash)
 	if err != nil {
+		if addr == debugAddr {
+			log.Info("FLAT_READER_STORAGE", "addr", addr, "key", key, "error", err)
+		}
 		return common.Hash{}, err
 	}
 	if len(ret) == 0 {
+		if addr == debugAddr {
+			log.Info("FLAT_READER_STORAGE", "addr", addr, "key", key, "result", "empty")
+		}
 		return common.Hash{}, nil
 	}
 	// Perform the rlp-decode as the slot value is RLP-encoded in the state
@@ -211,6 +221,9 @@ func (r *flatReader) Storage(addr common.Address, key common.Hash) (common.Hash,
 	}
 	var value common.Hash
 	value.SetBytes(content)
+	if addr == debugAddr {
+		log.Info("FLAT_READER_STORAGE", "addr", addr, "key", key, "value", value)
+	}
 	return value, nil
 }
 
@@ -466,6 +479,9 @@ func (r *readerWithCache) Account(addr common.Address) (*types.StateAccount, err
 // with a flag indicating whether it's found in the cache or not. The returned
 // storage slot might be empty if it's not existent.
 func (r *readerWithCache) storage(addr common.Address, slot common.Hash) (common.Hash, bool, error) {
+	// Debug: target address for tracing
+	debugAddr := common.HexToAddress("0x000000aC89e4A66919059f45Bf3e8d1700B42731")
+
 	var (
 		value  common.Hash
 		ok     bool
@@ -479,12 +495,20 @@ func (r *readerWithCache) storage(addr common.Address, slot common.Hash) (common
 	}
 	bucket.lock.RUnlock()
 	if ok {
+		// Debug: log cache hit
+		if addr == debugAddr {
+			log.Info("CACHE_HIT", "addr", addr, "slot", slot, "value", value)
+		}
 		return value, true, nil
 	}
 	// Try to resolve the requested storage slot from the underlying reader
 	value, err := r.Reader.Storage(addr, slot)
 	if err != nil {
 		return common.Hash{}, false, err
+	}
+	// Debug: log cache miss and value from reader
+	if addr == debugAddr {
+		log.Info("CACHE_MISS", "addr", addr, "slot", slot, "value", value)
 	}
 	bucket.lock.Lock()
 	slots, ok = bucket.storages[addr]

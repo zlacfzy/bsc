@@ -22,6 +22,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/tracing"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/holiman/uint256"
 )
@@ -517,9 +518,19 @@ func opMstore8(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]
 }
 
 func opSload(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byte, error) {
+	// Debug: target address for tracing
+	debugAddr := common.HexToAddress("0x000000aC89e4A66919059f45Bf3e8d1700B42731")
+
 	loc := scope.Stack.peek()
 	hash := common.Hash(loc.Bytes32())
-	val := interpreter.evm.StateDB.GetState(scope.Contract.Address(), hash)
+	contractAddr := scope.Contract.Address()
+	val := interpreter.evm.StateDB.GetState(contractAddr, hash)
+
+	// Debug: log SLOAD for target address
+	if contractAddr == debugAddr {
+		log.Info("SLOAD_DEBUG", "contract", contractAddr, "slot", hash, "value", val)
+	}
+
 	loc.SetBytes(val.Bytes())
 	return nil, nil
 }
