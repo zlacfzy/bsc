@@ -231,12 +231,12 @@ func ApplyTransactionWithEVM(msg *Message, gp *GasPool, statedb *state.StateDB, 
 				if vmErr != nil {
 					errStr = vmErr.Error()
 				}
-				// Print full stack (from top to bottom)
+				// Print full stack (bottom to top, matching debug_traceTransaction format)
 				stackData := scope.StackData()
 				stackStrs := make([]string, len(stackData))
 				for i := 0; i < len(stackData); i++ {
-					// Reverse order: top of stack first
-					stackStrs[i] = stackData[len(stackData)-1-i].Hex()
+					// Same order as debug_traceTransaction: index 0 is stack bottom
+					stackStrs[i] = "0x" + stackData[i].Text(16)
 				}
 				log.Info("TRACE_OPCODE",
 					"step", stepCount,
