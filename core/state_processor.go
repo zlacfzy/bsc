@@ -236,7 +236,7 @@ func ApplyTransactionWithEVM(msg *Message, gp *GasPool, statedb *state.StateDB, 
 				stackStrs := make([]string, len(stackData))
 				for i := 0; i < len(stackData); i++ {
 					// Same order as debug_traceTransaction: index 0 is stack bottom
-					stackStrs[i] = "0x" + stackData[i].Text(16)
+					stackStrs[i] = stackData[i].Hex()
 				}
 				log.Info("TRACE_OPCODE",
 					"step", stepCount,
