@@ -763,15 +763,6 @@ func (s *StateDB) CreateContract(addr common.Address) {
 		obj.newContract = true
 		s.journal.createContract(addr)
 	}
-	//// In NoTries mode, when CREATE2 recreates a contract at an address that
-	//// previously had storage (e.g., after selfdestruct in a prior block),
-	//// we must mark it as destructed so GetCommittedState returns empty values
-	//// instead of reading stale storage from the snapshot.
-	//if s.db.NoTries() {
-	//	if _, exists := s.stateObjectsDestruct[addr]; !exists {
-	//		s.stateObjectsDestruct[addr] = obj
-	//	}
-	//}
 }
 
 // StateForPrefetch creates a mirrored StateDB instance that shares the same
@@ -1293,7 +1284,10 @@ func (s *StateDB) handleDestruction(noStorageWiping bool) (map[common.Hash]*acco
 		deletes[addrHash] = op
 
 		// Short circuit if the origin storage was empty.
-		if prev.Root == types.EmptyRootHash || s.db.TrieDB().IsVerkle() {
+		// In NoTries mode, prev.Root is always EmptyRootHash (see updateRoot()),
+		// so we cannot rely on it to determine if storage exists.
+		// We must try to delete storage via snapshot regardless.
+		if !s.db.NoTries() && (prev.Root == types.EmptyRootHash || s.db.TrieDB().IsVerkle()) {
 			continue
 		}
 		if noStorageWiping {
