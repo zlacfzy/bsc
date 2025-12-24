@@ -1169,7 +1169,9 @@ func (s *StateDB) fastDeleteStorage(snaps *snapshot.Tree, addrHash common.Hash, 
 	if err := iter.Error(); err != nil { // error might occur during iteration
 		return nil, nil, nil, err
 	}
-	if stack.Hash() != root {
+	// In NoTries mode, root is always EmptyRootHash (see updateRoot()),
+	// so we skip the hash verification. The snapshot is the source of truth.
+	if !s.db.NoTries() && stack.Hash() != root {
 		return nil, nil, nil, fmt.Errorf("snapshot is not matched, exp %x, got %x", root, stack.Hash())
 	}
 	return storages, storageOrigins, nodes, nil
