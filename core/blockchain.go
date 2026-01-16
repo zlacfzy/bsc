@@ -347,6 +347,14 @@ type BlockStats struct {
 // important to note that GetBlock can return any block and does not need to be
 // included in the canonical one where as GetBlockByNumber always represents the
 // canonical chain.
+
+// notifiedFinalBlock stores the finalized header and the time it was notified.
+// Used to measure early finalization benefit.
+type notifiedFinalBlock struct {
+	header *types.Header
+	time   time.Time
+}
+
 type BlockChain struct {
 	chainConfig *params.ChainConfig // Chain & network configuration
 	cfg         *BlockChainConfig   // Blockchain configuration
@@ -381,10 +389,10 @@ type BlockChain struct {
 
 	highestVerifiedHeader atomic.Pointer[types.Header]
 	highestVerifiedBlock  atomic.Pointer[types.Header]
-	currentBlock          atomic.Pointer[types.Header] // Current head of the chain
-	currentSnapBlock      atomic.Pointer[types.Header] // Current head of snap-sync
-	currentFinalBlock     atomic.Pointer[types.Header] // Latest (consensus) finalized block
-	highestNotifiedFinal  atomic.Pointer[types.Header] // Highest finalized block that has been notified (for deduplication)
+	currentBlock          atomic.Pointer[types.Header]       // Current head of the chain
+	currentSnapBlock      atomic.Pointer[types.Header]       // Current head of snap-sync
+	currentFinalBlock     atomic.Pointer[types.Header]       // Latest (consensus) finalized block
+	highestNotifiedFinal  atomic.Pointer[notifiedFinalBlock] // Highest finalized block that has been notified (for deduplication)
 	chasingHead           atomic.Pointer[types.Header]
 	historyPrunePoint     atomic.Pointer[history.PrunePoint]
 
@@ -1154,6 +1162,21 @@ func (bc *BlockChain) rewindHead(head *types.Header, root common.Hash) (*types.H
 // SetFinalized sets the finalized block.
 // This function differs slightly from Ethereum; we fine-tune it through the outer-layer setting finalizedBlockGauge.
 func (bc *BlockChain) SetFinalized(header *types.Header) {
+	if header != nil {
+		// Check if this is a new finalized block (not the same as current)
+		currentFinal := bc.currentFinalBlock.Load()
+		isNewFinal := currentFinal == nil || header.Hash() != currentFinal.Hash()
+
+		if isNewFinal {
+			// Check if this block was already notified via early finalization
+			highestNotified := bc.highestNotifiedFinal.Load()
+			if highestNotified != nil && highestNotified.header.Hash() == header.Hash() {
+				earlyMs := time.Since(highestNotified.time).Milliseconds()
+				log.Info("Early finalization benefit", "number", header.Number, "hash", header.Hash(), "earlyMs", earlyMs)
+			}
+		}
+	}
+
 	bc.currentFinalBlock.Store(header)
 	if header != nil {
 		rawdb.WriteFinalizedBlockHash(bc.db, header.Hash())
@@ -1175,22 +1198,25 @@ func (bc *BlockChain) NotifyFinalized(header *types.Header) {
 	highestNotified := bc.highestNotifiedFinal.Load()
 	if highestNotified != nil {
 		// Skip if older finalized block
-		if headerNumber < highestNotified.Number.Uint64() {
+		if headerNumber < highestNotified.header.Number.Uint64() {
 			finalizedSkippedOlderCounter.Inc(1)
 			return
 		}
 		// Skip if same finalized block (deduplicate by hash)
-		if headerHash == highestNotified.Hash() {
+		if headerHash == highestNotified.header.Hash() {
 			return
 		}
 		// Same height but different hash (possible reorg)
-		if headerNumber == highestNotified.Number.Uint64() {
+		if headerNumber == highestNotified.header.Number.Uint64() {
 			finalizedSkippedSameHeightCounter.Inc(1)
 		}
 	}
 
 	// Update highest notified before sending to prevent duplicate notifications
-	bc.highestNotifiedFinal.Store(header)
+	bc.highestNotifiedFinal.Store(&notifiedFinalBlock{
+		header: header,
+		time:   time.Now(),
+	})
 
 	bc.finalizedHeaderFeed.Send(FinalizedHeaderEvent{header})
 	finalizedBlockGauge.Update(int64(headerNumber))
