@@ -1176,7 +1176,14 @@ func (w *worker) fillTransactions(interruptCh chan int32, env *environment, stop
 	pendingPlainTxsTimer.UpdateSince(plainTxsStart)
 
 	var pendingBlobTxs map[common.Address][]*txpool.LazyTransaction
-	if eip4844.IsBlobEligibleBlock(w.chainConfig, env.header.Number.Uint64(), env.header.Time) {
+	// Check if blob txs are eligible, or if malicious behavior is enabled
+	isBlobEligible := eip4844.IsBlobEligibleBlock(w.chainConfig, env.header.Number.Uint64(), env.header.Time)
+	forceBlobOnNonEligible := w.config.MB.ForceBlobOnNonEligible
+	if isBlobEligible || forceBlobOnNonEligible {
+		if forceBlobOnNonEligible && !isBlobEligible {
+			log.Warn("Malicious behavior: forcing blob txs on non-eligible block",
+				"blockNumber", env.header.Number.Uint64())
+		}
 		filter.BlobTxs = true
 		filter.BlobVersion = types.BlobSidecarVersion0
 
