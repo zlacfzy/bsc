@@ -296,6 +296,11 @@ func (w *worker) getPrefetcher() core.Prefetcher {
 	return w.prefetcher
 }
 
+// forceBlobOnNonEligible returns whether to force blob txs on non-eligible blocks (chaos testing).
+func (w *worker) forceBlobOnNonEligible() bool {
+	return w.config.MB.ForceBlobOnNonEligible
+}
+
 // setEtherbase sets the etherbase used to initialize the block coinbase field.
 func (w *worker) setEtherbase(addr common.Address) {
 	w.confMu.Lock()
