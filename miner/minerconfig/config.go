@@ -32,7 +32,7 @@ var (
 	defaultRecommit              = 10 * time.Second
 	defaultMaxWaitProposalInSecs = uint64(45)
 
-	defaultGasCeil = uint64(55_000_000)
+	defaultGasCeil = uint64(30_000_000)
 	// Extra time for finalizing and committing blocks (excludes writing to disk).
 	defaultDelayLeftOver         = 15 * time.Millisecond
 	defaultBidSimulationLeftOver = 20 * time.Millisecond

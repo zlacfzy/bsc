@@ -191,6 +191,7 @@ const (
 	BlobTxMaxBlobs                     = 6
 	BlobBaseCost                       = 1 << 13 // Base execution gas cost for a blob.
 	BlobEligibleBlockInterval          = 5       // BEP-657: Blob transactions are only allowed in blocks where N % 5 == 0
+	PasteurBlobEligibleBlockInterval   = 10      // BEP-670: Blob eligible interval after Pasteur fork
 
 	HistoryServeWindow = 8191 // Number of blocks to serve historical block hashes for, EIP-2935.
 
@@ -198,10 +199,10 @@ const (
 )
 
 var (
-	// fermiBlockInterval                        = 0.45
+	// pasteurBlockInterval = 0.25
 	MinTimeDurationForBlobRequests     uint64 = uint64(float64(24*3600) * 18.2)                        // it keeps blob data available for 18.2 days in local
-	MinBlocksForBlobRequests           uint64 = uint64(float64(MinTimeDurationForBlobRequests) / 0.45) // ref: https://github.com/bnb-chain/BEPs/blob/master/BEPs/BEP-524.md#421-change-table.
-	DefaultExtraReserveForBlobRequests uint64 = uint64(24 * 3600 / 0.45)                               // it adds more time for expired blobs for some request cases, like expiry blob when remote peer is syncing, default 1 day.
+	MinBlocksForBlobRequests           uint64 = uint64(float64(MinTimeDurationForBlobRequests) / 0.25) // recalculated for 250ms block interval
+	DefaultExtraReserveForBlobRequests uint64 = uint64(24 * 3600 / 0.25)                               // recalculated for 250ms block interval
 
 	BreatheBlockInterval uint64 = 24 * 3600 // Controls the interval for updateValidatorSetV2
 

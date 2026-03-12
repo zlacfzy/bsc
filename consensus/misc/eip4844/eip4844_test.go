@@ -307,3 +307,48 @@ func TestBEP657(t *testing.T) {
 		}
 	}
 }
+
+func TestBEP670BlobInterval(t *testing.T) {
+	mendelTime := uint64(1000)
+	pasteurTime := uint64(2000)
+	cfg := *params.RialtoChainConfig
+	cfg.MendelTime = &mendelTime
+	cfg.PasteurTime = &pasteurTime
+	config := &cfg
+
+	// GetBlobEligibleBlockInterval: pre-Pasteur=5, post-Pasteur=10
+	if got := GetBlobEligibleBlockInterval(config, 1500); got != 5 {
+		t.Errorf("pre-Pasteur: want 5, got %d", got)
+	}
+	if got := GetBlobEligibleBlockInterval(config, 2000); got != 10 {
+		t.Errorf("post-Pasteur: want 10, got %d", got)
+	}
+
+	// IsBlobEligibleBlock with Pasteur interval
+	for _, tt := range []struct {
+		blockNum uint64
+		time     uint64
+		want     bool
+	}{
+		{5, 1500, true},  // pre-Pasteur: N%5==0
+		{10, 2000, true}, // post-Pasteur: N%10==0
+		{5, 2000, false}, // post-Pasteur: N%10!=0
+	} {
+		if got := IsBlobEligibleBlock(config, tt.blockNum, tt.time); got != tt.want {
+			t.Errorf("IsBlobEligibleBlock(%d, %d) = %v, want %v", tt.blockNum, tt.time, got, tt.want)
+		}
+	}
+
+	// CalcExcessBlobGas: non-eligible parent inherits, eligible parent recalculates
+	excess := uint64(500000)
+	used := uint64(0)
+	parent := &types.Header{Number: big.NewInt(5), Time: 2000, ExcessBlobGas: &excess, BlobGasUsed: &used}
+	if got := CalcExcessBlobGas(config, parent, 2000); got != excess {
+		t.Errorf("Pasteur inherit: want %d, got %d", excess, got)
+	}
+	parent = &types.Header{Number: big.NewInt(10), Time: 2000, ExcessBlobGas: &excess, BlobGasUsed: &used}
+	targetBlobGas := uint64(config.BlobScheduleConfig.Cancun.Target) * params.BlobTxBlobGasPerBlob
+	if got := CalcExcessBlobGas(config, parent, 2000); got != excess-targetBlobGas {
+		t.Errorf("Pasteur recalc: want %d, got %d", excess-targetBlobGas, got)
+	}
+}

@@ -22,9 +22,10 @@ const (
 
 	// used to avoid of DDOS attack
 	// It's the max number of received votes per second from one peer
-	// 21 validators exist now, so 21 votes will be produced every one block interval
-	// so the limit is 47 ~= 21/0.45, here set it to 68 with a buffer.
-	receiveRateLimitPerSecond = 68
+	// 21 validators exist now, with BEP-667 vote interval=2 and BEP-670 block interval=250ms,
+	// votes are produced every 2 blocks, so the rate is 21/(0.25*2) = 42 votes/sec.
+	// Set to 60 with a buffer.
+	receiveRateLimitPerSecond = 60
 
 	// the time span of one period
 	secondsPerPeriod = float64(30)

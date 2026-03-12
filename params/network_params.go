@@ -32,5 +32,5 @@ var (
 	// considered immutable (i.e. soft finality). It is used by the downloader as a
 	// hard limit against deep ancestors, by the blockchain against deep reorgs, by
 	// the freezer as the cutoff threshold and by clique as the snapshot trust limit.
-	FullImmutabilityThreshold uint64 = 600_000
+	FullImmutabilityThreshold uint64 = 1_080_000 // adjusted for 250ms block interval
 )

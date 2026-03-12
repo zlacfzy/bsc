@@ -58,10 +58,12 @@ const (
 	defaultEpochLength   uint64 = 200  // Default number of blocks of checkpoint to update validatorSet from contract
 	lorentzEpochLength   uint64 = 500  // Epoch length starting from the Lorentz hard fork
 	maxwellEpochLength   uint64 = 1000 // Epoch length starting from the Maxwell hard fork
+	pasteurEpochLength   uint64 = 2000 // Epoch length starting from the Pasteur hard fork
 	defaultBlockInterval uint64 = 3000 // Default block interval in milliseconds
 	lorentzBlockInterval uint64 = 1500 // Block interval starting from the Lorentz hard fork
 	maxwellBlockInterval uint64 = 750  // Block interval starting from the Maxwell hard fork
 	fermiBlockInterval   uint64 = 450  // Block interval starting from the Fermi hard fork
+	pasteurBlockInterval uint64 = 250  // Block interval starting from the Pasteur hard fork
 	defaultTurnLength    uint8  = 1    // Default consecutive number of blocks a validator receives priority for block production
 
 	extraVanity      = 32 // Fixed number of extra-data prefix bytes reserved for signer vanity
@@ -806,13 +808,10 @@ func (p *Parlia) snapshot(chain consensus.ChainHeaderReader, number uint64, hash
 		// consider the checkpoint trusted and snapshot it.
 
 		// Unable to retrieve the exact EpochLength here.
-		// As known
-		// 		defaultEpochLength = 200 && turnLength = 1 or 4
-		// 		lorentzEpochLength = 500 && turnLength = 8
-		// 		maxwellEpochLength = 1000 && turnLength = 16
-		// So just select block number like 1200, 2200, 3200, we can always get the right validators from `number - 200`
+		// pasteurEpochLength is a multiple of all prior epoch lengths (200, 500, 1000),
+		// so `number - 200` always lands on a valid epoch boundary.
 		offset := uint64(200)
-		if number == 0 || (number%maxwellEpochLength == offset && (len(headers) > int(params.FullImmutabilityThreshold))) {
+		if number == 0 || (number%pasteurEpochLength == offset && (len(headers) > int(params.FullImmutabilityThreshold))) {
 			var (
 				checkpoint    *types.Header
 				blockHash     common.Hash
@@ -829,7 +828,9 @@ func (p *Parlia) snapshot(chain consensus.ChainHeaderReader, number uint64, hash
 				blockHeader := chain.GetHeaderByNumber(number)
 				if blockHeader != nil {
 					blockHash = blockHeader.Hash()
-					if p.chainConfig.IsFermi(blockHeader.Number, blockHeader.Time) {
+					if p.chainConfig.IsPasteur(blockHeader.Number, blockHeader.Time) {
+						blockInterval = pasteurBlockInterval
+					} else if p.chainConfig.IsFermi(blockHeader.Number, blockHeader.Time) {
 						blockInterval = fermiBlockInterval
 					} else if p.chainConfig.IsMaxwell(blockHeader.Number, blockHeader.Time) {
 						blockInterval = maxwellBlockInterval
@@ -840,7 +841,9 @@ func (p *Parlia) snapshot(chain consensus.ChainHeaderReader, number uint64, hash
 				if number > offset { // exclude `number == 200`
 					blockBeforeCheckpoint := chain.GetHeaderByNumber(number - offset - 1)
 					if blockBeforeCheckpoint != nil {
-						if p.chainConfig.IsMaxwell(blockBeforeCheckpoint.Number, blockBeforeCheckpoint.Time) {
+						if p.chainConfig.IsPasteur(blockBeforeCheckpoint.Number, blockBeforeCheckpoint.Time) {
+							epochLength = pasteurEpochLength
+						} else if p.chainConfig.IsMaxwell(blockBeforeCheckpoint.Number, blockBeforeCheckpoint.Time) {
 							epochLength = maxwellEpochLength
 						} else if p.chainConfig.IsLorentz(blockBeforeCheckpoint.Number, blockBeforeCheckpoint.Time) {
 							epochLength = lorentzEpochLength
