@@ -42,7 +42,7 @@ const (
 
 	// For BSC, freezing 30,000 blocks at once will seriously affect performance near the chain head.
 	// Set to 200 to keep up with 450ms block interval (~133 blocks/min) while limiting I/O impact.
-	SlowFreezerBatchLimit = 200
+	SlowFreezerBatchLimit = 20000
 	SlowdownFreezeWindow  = 24 * time.Hour
 )
 
