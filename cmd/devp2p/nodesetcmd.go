@@ -230,6 +230,10 @@ func ethFilter(args []string) (nodeFilter, error) {
 	switch args[0] {
 	case "mainnet":
 		filter = forkid.NewStaticFilter(params.MainnetChainConfig, core.DefaultGenesisBlock().ToBlock())
+	case "bsc":
+		filter = forkid.NewStaticFilter(params.BSCChainConfig, core.DefaultBSCGenesisBlock().ToBlock())
+	case "chapel":
+		filter = forkid.NewStaticFilter(params.ChapelChainConfig, core.DefaultChapelGenesisBlock().ToBlock())
 	default:
 		return nil, fmt.Errorf("unknown network %q", args[0])
 	}

@@ -55,16 +55,44 @@ var V5Bootnodes = []string{
 
 const dnsPrefix = "enrtree://AKA3AM6LPBYEUDMVNU3BSVQJ5AD45Y7YPOHJLEF6W26QOE4VTUDPE@"
 
+// bscDNSPrefix is the enrtree:// prefix (signing public key) for the BSC-curated
+// DNS discovery lists. The public key here MUST match the key used to sign the
+// tree via `devp2p dns sign` (see docs/bsc_p2p_divergence.md).
+//
+// TODO(bsc): replace the placeholder public key below with the real one once the
+// BSC enrtree is published. While it remains the placeholder, KnownDNSNetwork
+// returns "" for BSC/Chapel so that default startup falls back to bootnodes
+// instead of feeding an unparseable enrtree URL into DNS discovery (which would
+// make eth backend startup fail in dnsdisc.NewIterator).
+const bscDNSPlaceholderPrefix = "enrtree://REPLACE_WITH_BSC_TREE_PUBKEY@"
+
+const bscDNSPrefix = bscDNSPlaceholderPrefix
+
+// bscDNSDomain / chapelDNSDomain are the DNS names under which the signed BSC
+// enrtrees are published. These must match the --domain passed to `devp2p dns sign`.
+const (
+	bscDNSDomain    = "bsc.bnbchain.org"
+	chapelDNSDomain = "chapel.bnbchain.org"
+)
+
 // KnownDNSNetwork returns the address of a public DNS-based node list for the given
 // genesis hash and protocol. See https://github.com/ethereum/discv4-dns-lists for more
 // information.
 func KnownDNSNetwork(genesis common.Hash, protocol string) string {
-	var net string
 	switch genesis {
 	case MainnetGenesisHash:
-		net = "mainnet"
+		return dnsPrefix + protocol + ".mainnet.ethdisco.net"
+	case BSCGenesisHash:
+		if bscDNSPrefix == bscDNSPlaceholderPrefix {
+			return "" // enrtree key not yet published; fall back to bootnodes
+		}
+		return bscDNSPrefix + protocol + "." + bscDNSDomain
+	case ChapelGenesisHash:
+		if bscDNSPrefix == bscDNSPlaceholderPrefix {
+			return "" // enrtree key not yet published; fall back to bootnodes
+		}
+		return bscDNSPrefix + protocol + "." + chapelDNSDomain
 	default:
 		return ""
 	}
-	return dnsPrefix + protocol + "." + net + ".ethdisco.net"
 }
