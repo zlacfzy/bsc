@@ -28,6 +28,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/rawdb"
 	"github.com/ethereum/go-ethereum/core/stateless"
 	"github.com/ethereum/go-ethereum/core/tracing"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -1439,20 +1440,19 @@ func (s *StateDB) commitAndFlush(block uint64, deleteEmptyObjects bool, noStorag
 		return nil, err
 	}
 
-	/* TODO(Nathan): adapt to support incremental db
 	// Write dirty contract code into incremental db if any exists and incr is enabled
-	if db := s.db.TrieDB(); db != nil && len(ret.codes) > 0 && db.IsIncrEnabled() {
-		codes := make(map[common.Address]rawdb.ContractCode)
-		for hash, code := range ret.codes {
-			codes[hash] = rawdb.ContractCode{
-				Hash: code.hash,
-				Blob: code.blob,
+	if db := s.db.TrieDB(); db != nil && len(ret.Codes) > 0 && db.IsIncrEnabled() {
+		codes := make(map[common.Address]rawdb.ContractCode, len(ret.Codes))
+		for addr, code := range ret.Codes {
+			codes[addr] = rawdb.ContractCode{
+				Hash: code.Hash,
+				Blob: code.Blob,
 			}
 		}
-		if err = db.WriteContractCodes(codes); err != nil {
+		if err := db.WriteContractCodes(codes); err != nil {
 			return nil, err
 		}
-	}*/
+	}
 
 	if deriveCodeFields {
 		if err := ret.deriveCodeFields(s.reader); err != nil {
