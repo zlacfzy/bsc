@@ -357,13 +357,6 @@ func New(stack *node.Node, config *ethconfig.Config) (*Ethereum, error) {
 			HistoryPolicy:           histPolicy,
 			TxLookupLimit:           int64(min(config.TransactionHistory, math.MaxInt64)),
 			PathSyncFlush:           config.PathSyncFlush,
-			EnableIncr:              config.EnableIncrSnapshots,
-			IncrHistoryPath:         config.IncrSnapshotPath,
-			IncrHistory:             config.IncrSnapshotBlockInterval,
-			IncrStateBuffer:         config.IncrSnapshotStateBuffer,
-			IncrKeptBlocks:          config.IncrSnapshotKeptBlocks,
-			UseRemoteIncrSnapshot:   config.UseRemoteIncrSnapshot,
-			RemoteIncrURL:           config.RemoteIncrSnapshotURL,
 
 			VmConfig: vm.Config{
 				EnablePreimageRecording: config.EnablePreimageRecording,
@@ -845,9 +838,9 @@ func (s *Ethereum) Downloader() *downloader.Downloader { return s.handler.downlo
 func (s *Ethereum) SubscribeSyncEvents(ch chan<- downloader.SyncEvent) event.Subscription {
 	return s.handler.downloader.SubscribeSyncEvents(ch)
 }
-func (s *Ethereum) Synced() bool                       { return s.handler.synced.Load() }
-func (s *Ethereum) SetSynced()                         { s.handler.enableSyncedFeatures() }
-func (s *Ethereum) ArchiveMode() bool                  { return s.config.NoPruning }
+func (s *Ethereum) Synced() bool      { return s.handler.synced.Load() }
+func (s *Ethereum) SetSynced()        { s.handler.enableSyncedFeatures() }
+func (s *Ethereum) ArchiveMode() bool { return s.config.NoPruning }
 func (s *Ethereum) SyncMode() downloader.SyncMode {
 	mode, _ := s.handler.chainSync.modeAndLocalHead()
 	return mode
