@@ -82,27 +82,27 @@ func testHandshake(t *testing.T, protocol uint) {
 				code uint64
 				data interface{}
 				want error
-			}{code: StatusMsg, data: StatusPacket{10, 1, genesis.Hash(), forkID, 0, head.Number.Uint64(), head.Hash()}, want: errProtocolVersionMismatch},
+			}{code: StatusMsg, data: StatusPacket{10, 1, td, genesis.Hash(), forkID, 0, head.Number.Uint64(), head.Hash()}, want: errProtocolVersionMismatch},
 			struct {
 				code uint64
 				data interface{}
 				want error
-			}{code: StatusMsg, data: StatusPacket{uint32(protocol), 999, genesis.Hash(), forkID, 0, head.Number.Uint64(), head.Hash()}, want: errNetworkIDMismatch},
+			}{code: StatusMsg, data: StatusPacket{uint32(protocol), 999, td, genesis.Hash(), forkID, 0, head.Number.Uint64(), head.Hash()}, want: errNetworkIDMismatch},
 			struct {
 				code uint64
 				data interface{}
 				want error
-			}{code: StatusMsg, data: StatusPacket{uint32(protocol), 1, common.Hash{3}, forkID, 0, head.Number.Uint64(), head.Hash()}, want: errGenesisMismatch},
+			}{code: StatusMsg, data: StatusPacket{uint32(protocol), 1, td, common.Hash{3}, forkID, 0, head.Number.Uint64(), head.Hash()}, want: errGenesisMismatch},
 			struct {
 				code uint64
 				data interface{}
 				want error
-			}{code: StatusMsg, data: StatusPacket{uint32(protocol), 1, genesis.Hash(), forkid.ID{Hash: [4]byte{0x00, 0x01, 0x02, 0x03}}, 0, head.Number.Uint64(), head.Hash()}, want: errForkIDRejected},
+			}{code: StatusMsg, data: StatusPacket{uint32(protocol), 1, td, genesis.Hash(), forkid.ID{Hash: [4]byte{0x00, 0x01, 0x02, 0x03}}, 0, head.Number.Uint64(), head.Hash()}, want: errForkIDRejected},
 			struct {
 				code uint64
 				data interface{}
 				want error
-			}{code: StatusMsg, data: StatusPacket{uint32(protocol), 1, genesis.Hash(), forkID, head.Number.Uint64() + 1, head.Number.Uint64(), head.Hash()}, want: errInvalidBlockRange},
+			}{code: StatusMsg, data: StatusPacket{uint32(protocol), 1, td, genesis.Hash(), forkID, head.Number.Uint64() + 1, head.Number.Uint64(), head.Hash()}, want: errInvalidBlockRange},
 		)
 	}
 	for i, test := range tests {

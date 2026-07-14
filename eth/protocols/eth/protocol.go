@@ -41,7 +41,7 @@ const ProtocolName = "eth"
 
 // ProtocolVersions are the supported versions of the `eth` protocol (first
 // is primary).
-var ProtocolVersions = []uint{ /*ETH70,*/ ETH68}
+var ProtocolVersions = []uint{ETH70, ETH68}
 
 // protocolLengths are the number of implemented message corresponding to
 // different protocol versions.
@@ -129,13 +129,15 @@ func (p *UpgradeStatusPacket) GetExtension() (*UpgradeStatusExtension, error) {
 	return extension, nil
 }
 
-// StatusPacket69 is the network packet for the status message.
+// StatusPacket is the network packet for the status message in eth/70.
+// It follows upstream eth/70, except that TD is kept since Parlia chains
+// still rely on total difficulty; there is no UpgradeStatusMsg exchange.
 type StatusPacket struct {
 	ProtocolVersion uint32
 	NetworkID       uint64
-	// TD              *big.Int //TODO(Nathan): add it before enable ETH70
-	Genesis common.Hash
-	ForkID  forkid.ID
+	TD              *big.Int
+	Genesis         common.Hash
+	ForkID          forkid.ID
 	// initial available block range
 	EarliestBlock   uint64
 	LatestBlock     uint64
