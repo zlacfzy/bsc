@@ -2106,7 +2106,12 @@ func (bc *BlockChain) writeBlockAndSetHead(block *types.Block, receipts []*types
 	}
 	if reorg {
 		bc.highestVerifiedBlock.Store(types.CopyHeader(block.Header()))
+		headSendStart := time.Now()
 		bc.highestVerifiedBlockFeed.Send(HighestVerifiedBlockEvent{Header: block.Header()})
+		if d := time.Since(headSendStart); d > 50*time.Millisecond {
+			// Temporary diagnostics: subscribers are the vote pool and the vote manager (10-slot channels each).
+			log.Warn("VotePool diag: highestVerifiedBlockFeed.Send blocked block import", "number", block.Number(), "elapsed", common.PrettyDuration(d))
+		}
 		if sealedBlockSender != nil {
 			// If the local DB is corrupted, writeBlockWithState may fail.
 			// It's fine — other nodes will persist the block.

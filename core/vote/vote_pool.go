@@ -26,6 +26,9 @@ const (
 	upperLimitOfVoteBlockNumber = 11 // refer to fetcher.maxUncleDist
 
 	highestVerifiedBlockChanSize = 10 // highestVerifiedBlockChanSize is the size of channel listening to HighestVerifiedBlockEvent.
+	// diagSlowThreshold: temporary diagnostics. Any wait or notification inside the
+	// vote pool that exceeds it is logged at Warn with the "VotePool diag" prefix.
+	diagSlowThreshold = 50 * time.Millisecond
 
 	defaultMajorityThreshold = 14 // this is an inaccurate value, mainly used for metric acquisition, ref parlia.verifyVoteAttestation
 )
@@ -118,15 +121,27 @@ func (pool *VotePool) loop() {
 		case ev := <-pool.highestVerifiedBlockCh:
 			if ev.Header != nil {
 				latestBlockNumber := ev.Header.Number.Uint64()
+				if backlog := len(pool.highestVerifiedBlockCh); backlog >= highestVerifiedBlockChanSize/2 {
+					log.Warn("VotePool diag: head event backlog, loop lagging behind import", "number", latestBlockNumber, "backlog", backlog, "cap", highestVerifiedBlockChanSize)
+				}
+				headStart := time.Now()
 				pool.prune(latestBlockNumber)
+				pruned := time.Now()
 				pool.transferVotesFromFutureToCur(ev.Header)
+				if total := time.Since(headStart); total > diagSlowThreshold {
+					log.Warn("VotePool diag: slow head processing", "number", latestBlockNumber, "prune", common.PrettyDuration(pruned.Sub(headStart)), "transfer", common.PrettyDuration(time.Since(pruned)))
+				}
 			}
 		case <-pool.highestVerifiedBlockSub.Err():
 			return
 
 		// Handle votes channel and put the vote into vote pool.
 		case vote := <-pool.votesCh:
+			putStart := time.Now()
 			pool.putIntoVotePool(vote)
+			if d := time.Since(putStart); d > diagSlowThreshold {
+				log.Warn("VotePool diag: slow putIntoVotePool", "number", vote.Data.TargetNumber, "elapsed", common.PrettyDuration(d))
+			}
 		}
 	}
 }
@@ -183,7 +198,11 @@ func (pool *VotePool) putIntoVotePool(vote *types.VoteEnvelope) bool {
 
 		// Send vote for handler usage of broadcasting to peers.
 		voteEv := core.NewVoteEvent{Vote: vote}
+		sendStart := time.Now()
 		pool.votesFeed.Send(voteEv)
+		if d := time.Since(sendStart); d > diagSlowThreshold {
+			log.Warn("VotePool diag: votesFeed.Send blocked on put path (pool lock not held)", "number", targetNumber, "elapsed", common.PrettyDuration(d))
+		}
 	}
 
 	pool.putVote(votes, votesPq, vote, voteData, voteHash, isFutureVote)
@@ -293,7 +312,11 @@ func (pool *VotePool) transfer(blockHash common.Hash) {
 
 		// In the process of transfer, send valid vote to votes channel for handler usage
 		voteEv := core.NewVoteEvent{Vote: vote}
+		sendStart := time.Now()
 		pool.votesFeed.Send(voteEv)
+		if d := time.Since(sendStart); d > diagSlowThreshold {
+			log.Warn("VotePool diag: votesFeed.Send blocked on transfer path (pool lock held, blocks import readers)", "number", voteBox.blockNumber, "elapsed", common.PrettyDuration(d))
+		}
 		validVotes = append(validVotes, vote)
 	}
 
@@ -361,8 +384,12 @@ func (pool *VotePool) GetVotes() []*types.VoteEnvelope {
 }
 
 func (pool *VotePool) FetchVotesByBlockHash(targetBlockHash common.Hash, sourceBlockNum uint64) []*types.VoteEnvelope {
+	lockStart := time.Now()
 	pool.mu.RLock()
 	defer pool.mu.RUnlock()
+	if d := time.Since(lockStart); d > diagSlowThreshold {
+		log.Warn("VotePool diag: FetchVotesByBlockHash waited for pool lock", "target", targetBlockHash, "elapsed", common.PrettyDuration(d))
+	}
 	if voteBox, ok := pool.curVotes[targetBlockHash]; ok {
 		var res []*types.VoteEnvelope
 		for _, vote := range voteBox.voteMessages {
