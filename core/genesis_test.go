@@ -194,6 +194,15 @@ func TestGenesisHashes(t *testing.T) {
 		want    common.Hash
 	}{
 		{DefaultGenesisBlock(), params.MainnetGenesisHash},
+<<<<<<< HEAD
+||||||| 117e067f0f
+		{DefaultSepoliaGenesisBlock(), params.SepoliaGenesisHash},
+		{DefaultHoleskyGenesisBlock(), params.HoleskyGenesisHash},
+		{DefaultHoodiGenesisBlock(), params.HoodiGenesisHash},
+=======
+		{DefaultSepoliaGenesisBlock(), params.SepoliaGenesisHash},
+		{DefaultHoodiGenesisBlock(), params.HoodiGenesisHash},
+>>>>>>> geth-v1.17.9
 	} {
 		// Test via MustCommit
 		db := rawdb.NewMemoryDatabase()
@@ -202,7 +211,7 @@ func TestGenesisHashes(t *testing.T) {
 		}
 		// Test via ToBlock
 		if have := c.genesis.ToBlock().Hash(); have != c.want {
-			t.Errorf("case: %d a), want: %s, got: %s", i, c.want.Hex(), have.Hex())
+			t.Errorf("case: %d b), want: %s, got: %s", i, c.want.Hex(), have.Hex())
 		}
 	}
 }
@@ -306,8 +315,6 @@ func TestBinaryGenesisCommit(t *testing.T) {
 		BlobScheduleConfig: &params.BlobScheduleConfig{
 			Cancun: params.DefaultCancunBlobConfig,
 			Prague: params.DefaultPragueBlobConfig,
-			Osaka:  params.DefaultOsakaBlobConfig,
-			UBT:    params.DefaultPragueBlobConfig,
 		},
 	}
 

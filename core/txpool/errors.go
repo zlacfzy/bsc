@@ -25,6 +25,11 @@ var (
 	// within the pool.
 	ErrAlreadyKnown = errors.New("already known")
 
+	// ErrOutOfCapacity is returned if a transaction is refused because there is
+	// no room for it, rather than for anything wrong with it or with the peer
+	// that sent it.
+	ErrOutOfCapacity = errors.New("out of capacity")
+
 	// ErrInvalidSender is returned if the transaction contains an invalid signature.
 	ErrInvalidSender = errors.New("invalid sender")
 
@@ -74,7 +79,14 @@ var (
 
 	// ErrKZGVerificationError is returned when a KZG proof was not verified correctly.
 	ErrKZGVerificationError = errors.New("KZG verification error")
+<<<<<<< HEAD
 
 	// ErrInBlackList is returned if the transaction send by banned address
 	ErrInBlackList = errors.New("sender or to in black list")
+||||||| 117e067f0f
+=======
+
+	// ErrSidecarFormatError is returned when sidecar is malformed
+	ErrSidecarFormatError = errors.New("Wrong sidecar format")
+>>>>>>> geth-v1.17.9
 )

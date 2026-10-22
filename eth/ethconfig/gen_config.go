@@ -21,17 +21,28 @@ func (c Config) MarshalTOML() (interface{}, error) {
 		Genesis                 *core.Genesis `toml:",omitempty"`
 		NetworkId               uint64
 		SyncMode                SyncMode
+<<<<<<< HEAD
 		DisablePeerTxBroadcast  bool
 		EVNNodeIDsToAdd         []enode.ID
 		EVNNodeIDsToRemove      []enode.ID
 		HistoryMode             history.HistoryMode
+||||||| 117e067f0f
+		HistoryMode             history.HistoryMode
+=======
+		HistoryMode             history.HistoryPolicy
+>>>>>>> geth-v1.17.9
 		EthDiscoveryURLs        []string
 		SnapDiscoveryURLs       []string
 		BscDiscoveryURLs        []string
 		NoPruning               bool
 		NoPrefetch              bool
+<<<<<<< HEAD
 		DirectBroadcast         bool
 		DisableSnapProtocol     bool
+||||||| 117e067f0f
+=======
+		NoPrecompileCache       bool
+>>>>>>> geth-v1.17.9
 		TxLookupLimit           uint64 `toml:",omitempty"`
 		TransactionHistory      uint64 `toml:",omitempty"`
 		BlockHistory            uint64 `toml:",omitempty"`
@@ -69,20 +80,30 @@ func (c Config) MarshalTOML() (interface{}, error) {
 		EnablePreimageRecording bool
 		EnableWitnessStats      bool
 		StatelessSelfValidation bool
-		EnableStateSizeTracking bool
+		SnapV2                  bool
 		VMTrace                 string
 		VMTraceJsonConfig       string
 		RPCGasCap               uint64
 		RPCEVMTimeout           time.Duration
 		RPCTxFeeCap             float64
+<<<<<<< HEAD
 		OverridePassedForkTime  *uint64       `toml:",omitempty"`
 		OverrideLorentz         *uint64       `toml:",omitempty"`
 		OverrideMaxwell         *uint64       `toml:",omitempty"`
 		OverrideFermi           *uint64       `toml:",omitempty"`
+||||||| 117e067f0f
+=======
+		EngineMaxReorgDepth     uint64
+>>>>>>> geth-v1.17.9
 		OverrideOsaka           *uint64       `toml:",omitempty"`
+<<<<<<< HEAD
 		OverrideMendel          *uint64       `toml:",omitempty"`
 		OverridePasteur         *uint64       `toml:",omitempty"`
 		OverrideJenner          *uint64       `toml:",omitempty"`
+||||||| 117e067f0f
+=======
+		OverrideAmsterdam       *uint64       `toml:",omitempty"`
+>>>>>>> geth-v1.17.9
 		OverrideBPO1            *uint64       `toml:",omitempty"`
 		OverrideBPO2            *uint64       `toml:",omitempty"`
 		OverrideUBT             *uint64       `toml:",omitempty"`
@@ -104,8 +125,13 @@ func (c Config) MarshalTOML() (interface{}, error) {
 	enc.BscDiscoveryURLs = c.BscDiscoveryURLs
 	enc.NoPruning = c.NoPruning
 	enc.NoPrefetch = c.NoPrefetch
+<<<<<<< HEAD
 	enc.DirectBroadcast = c.DirectBroadcast
 	enc.DisableSnapProtocol = c.DisableSnapProtocol
+||||||| 117e067f0f
+=======
+	enc.NoPrecompileCache = c.NoPrecompileCache
+>>>>>>> geth-v1.17.9
 	enc.TxLookupLimit = c.TxLookupLimit
 	enc.TransactionHistory = c.TransactionHistory
 	enc.BlockHistory = c.BlockHistory
@@ -143,20 +169,30 @@ func (c Config) MarshalTOML() (interface{}, error) {
 	enc.EnablePreimageRecording = c.EnablePreimageRecording
 	enc.EnableWitnessStats = c.EnableWitnessStats
 	enc.StatelessSelfValidation = c.StatelessSelfValidation
-	enc.EnableStateSizeTracking = c.EnableStateSizeTracking
+	enc.SnapV2 = c.SnapV2
 	enc.VMTrace = c.VMTrace
 	enc.VMTraceJsonConfig = c.VMTraceJsonConfig
 	enc.RPCGasCap = c.RPCGasCap
 	enc.RPCEVMTimeout = c.RPCEVMTimeout
 	enc.RPCTxFeeCap = c.RPCTxFeeCap
+<<<<<<< HEAD
 	enc.OverridePassedForkTime = c.OverridePassedForkTime
 	enc.OverrideLorentz = c.OverrideLorentz
 	enc.OverrideMaxwell = c.OverrideMaxwell
 	enc.OverrideFermi = c.OverrideFermi
+||||||| 117e067f0f
+=======
+	enc.EngineMaxReorgDepth = c.EngineMaxReorgDepth
+>>>>>>> geth-v1.17.9
 	enc.OverrideOsaka = c.OverrideOsaka
+<<<<<<< HEAD
 	enc.OverrideMendel = c.OverrideMendel
 	enc.OverridePasteur = c.OverridePasteur
 	enc.OverrideJenner = c.OverrideJenner
+||||||| 117e067f0f
+=======
+	enc.OverrideAmsterdam = c.OverrideAmsterdam
+>>>>>>> geth-v1.17.9
 	enc.OverrideBPO1 = c.OverrideBPO1
 	enc.OverrideBPO2 = c.OverrideBPO2
 	enc.OverrideUBT = c.OverrideUBT
@@ -173,17 +209,28 @@ func (c *Config) UnmarshalTOML(unmarshal func(interface{}) error) error {
 		Genesis                 *core.Genesis `toml:",omitempty"`
 		NetworkId               *uint64
 		SyncMode                *SyncMode
+<<<<<<< HEAD
 		DisablePeerTxBroadcast  *bool
 		EVNNodeIDsToAdd         []enode.ID
 		EVNNodeIDsToRemove      []enode.ID
 		HistoryMode             *history.HistoryMode
+||||||| 117e067f0f
+		HistoryMode             *history.HistoryMode
+=======
+		HistoryMode             *history.HistoryPolicy
+>>>>>>> geth-v1.17.9
 		EthDiscoveryURLs        []string
 		SnapDiscoveryURLs       []string
 		BscDiscoveryURLs        []string
 		NoPruning               *bool
 		NoPrefetch              *bool
+<<<<<<< HEAD
 		DirectBroadcast         *bool
 		DisableSnapProtocol     *bool
+||||||| 117e067f0f
+=======
+		NoPrecompileCache       *bool
+>>>>>>> geth-v1.17.9
 		TxLookupLimit           *uint64 `toml:",omitempty"`
 		TransactionHistory      *uint64 `toml:",omitempty"`
 		BlockHistory            *uint64 `toml:",omitempty"`
@@ -221,20 +268,30 @@ func (c *Config) UnmarshalTOML(unmarshal func(interface{}) error) error {
 		EnablePreimageRecording *bool
 		EnableWitnessStats      *bool
 		StatelessSelfValidation *bool
-		EnableStateSizeTracking *bool
+		SnapV2                  *bool
 		VMTrace                 *string
 		VMTraceJsonConfig       *string
 		RPCGasCap               *uint64
 		RPCEVMTimeout           *time.Duration
 		RPCTxFeeCap             *float64
+<<<<<<< HEAD
 		OverridePassedForkTime  *uint64        `toml:",omitempty"`
 		OverrideLorentz         *uint64        `toml:",omitempty"`
 		OverrideMaxwell         *uint64        `toml:",omitempty"`
 		OverrideFermi           *uint64        `toml:",omitempty"`
+||||||| 117e067f0f
+=======
+		EngineMaxReorgDepth     *uint64
+>>>>>>> geth-v1.17.9
 		OverrideOsaka           *uint64        `toml:",omitempty"`
+<<<<<<< HEAD
 		OverrideMendel          *uint64        `toml:",omitempty"`
 		OverridePasteur         *uint64        `toml:",omitempty"`
 		OverrideJenner          *uint64        `toml:",omitempty"`
+||||||| 117e067f0f
+=======
+		OverrideAmsterdam       *uint64        `toml:",omitempty"`
+>>>>>>> geth-v1.17.9
 		OverrideBPO1            *uint64        `toml:",omitempty"`
 		OverrideBPO2            *uint64        `toml:",omitempty"`
 		OverrideUBT             *uint64        `toml:",omitempty"`
@@ -283,12 +340,19 @@ func (c *Config) UnmarshalTOML(unmarshal func(interface{}) error) error {
 	if dec.NoPrefetch != nil {
 		c.NoPrefetch = *dec.NoPrefetch
 	}
+<<<<<<< HEAD
 	if dec.DirectBroadcast != nil {
 		c.DirectBroadcast = *dec.DirectBroadcast
 	}
 	if dec.DisableSnapProtocol != nil {
 		c.DisableSnapProtocol = *dec.DisableSnapProtocol
 	}
+||||||| 117e067f0f
+=======
+	if dec.NoPrecompileCache != nil {
+		c.NoPrecompileCache = *dec.NoPrecompileCache
+	}
+>>>>>>> geth-v1.17.9
 	if dec.TxLookupLimit != nil {
 		c.TxLookupLimit = *dec.TxLookupLimit
 	}
@@ -400,8 +464,8 @@ func (c *Config) UnmarshalTOML(unmarshal func(interface{}) error) error {
 	if dec.StatelessSelfValidation != nil {
 		c.StatelessSelfValidation = *dec.StatelessSelfValidation
 	}
-	if dec.EnableStateSizeTracking != nil {
-		c.EnableStateSizeTracking = *dec.EnableStateSizeTracking
+	if dec.SnapV2 != nil {
+		c.SnapV2 = *dec.SnapV2
 	}
 	if dec.VMTrace != nil {
 		c.VMTrace = *dec.VMTrace
@@ -418,6 +482,7 @@ func (c *Config) UnmarshalTOML(unmarshal func(interface{}) error) error {
 	if dec.RPCTxFeeCap != nil {
 		c.RPCTxFeeCap = *dec.RPCTxFeeCap
 	}
+<<<<<<< HEAD
 	if dec.OverridePassedForkTime != nil {
 		c.OverridePassedForkTime = dec.OverridePassedForkTime
 	}
@@ -430,9 +495,16 @@ func (c *Config) UnmarshalTOML(unmarshal func(interface{}) error) error {
 	if dec.OverrideFermi != nil {
 		c.OverrideFermi = dec.OverrideFermi
 	}
+||||||| 117e067f0f
+=======
+	if dec.EngineMaxReorgDepth != nil {
+		c.EngineMaxReorgDepth = *dec.EngineMaxReorgDepth
+	}
+>>>>>>> geth-v1.17.9
 	if dec.OverrideOsaka != nil {
 		c.OverrideOsaka = dec.OverrideOsaka
 	}
+<<<<<<< HEAD
 	if dec.OverrideMendel != nil {
 		c.OverrideMendel = dec.OverrideMendel
 	}
@@ -442,6 +514,12 @@ func (c *Config) UnmarshalTOML(unmarshal func(interface{}) error) error {
 	if dec.OverrideJenner != nil {
 		c.OverrideJenner = dec.OverrideJenner
 	}
+||||||| 117e067f0f
+=======
+	if dec.OverrideAmsterdam != nil {
+		c.OverrideAmsterdam = dec.OverrideAmsterdam
+	}
+>>>>>>> geth-v1.17.9
 	if dec.OverrideBPO1 != nil {
 		c.OverrideBPO1 = dec.OverrideBPO1
 	}

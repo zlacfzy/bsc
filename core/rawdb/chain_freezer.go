@@ -60,9 +60,7 @@ var (
 // key-value database to flat files for saving space on live database.
 type chainFreezer struct {
 	ancients ethdb.AncientStore // Ancient store for storing cold chain segment
-
-	// Optional Era database used as a backup for the pruned chain.
-	eradb *eradb.Store
+	eradb    *eradb.Store       // Optional Era database used as a backup for the pruned chain
 
 	quit    chan struct{}
 	wg      sync.WaitGroup
@@ -96,6 +94,7 @@ func newChainFreezer(datadir string, eraDir string, namespace string, readonly b
 	}
 	edb, err := eradb.New(resolveChainEraDir(datadir, eraDir))
 	if err != nil {
+		freezer.Close()
 		return nil, err
 	}
 	cf := chainFreezer{
@@ -446,7 +445,10 @@ func (f *chainFreezer) freezeRange(nfdb *nofreezedb, number, limit uint64) (hash
 			// Retrieve all the components of the canonical block.
 			hash := ReadCanonicalHash(nfdb, number)
 			if hash == (common.Hash{}) {
-				return fmt.Errorf("canonical hash missing, can't freeze block %d", number)
+				// A missing canonical mapping at the freeze frontier is almost
+				// always an orphaned block left by an unclean stop (header/body
+				// present by hash, but no number->hash mapping).
+				return fmt.Errorf("canonical hash missing, can't freeze block %d (block data present at height: %v)", number, ReadAllHashes(nfdb, number))
 			}
 			h, header := ReadHeaderAndRaw(nfdb, hash, number)
 			if len(header) == 0 {
@@ -460,6 +462,7 @@ func (f *chainFreezer) freezeRange(nfdb *nofreezedb, number, limit uint64) (hash
 			if len(receipts) == 0 {
 				return fmt.Errorf("block receipts missing, can't freeze block %d", number)
 			}
+<<<<<<< HEAD
 			td := ReadTdRLP(nfdb, hash, number)
 			if len(td) == 0 {
 				return fmt.Errorf("total difficulty missing, can't freeze block %d", number)
@@ -473,6 +476,19 @@ func (f *chainFreezer) freezeRange(nfdb *nofreezedb, number, limit uint64) (hash
 				}
 			}
 
+||||||| 117e067f0f
+=======
+			// An empty block access list is allowed and may occur in multiple
+			// scenarios, such as:
+			//   - pre-Amsterdam blocks
+			//   - post-Amsterdam blocks with the BAL absent (e.g. pruned by network)
+			//   - post-Amsterdam blocks with an explicitly empty BAL
+			//
+			// In these cases, a nil entry will be stored in the BAL table as the
+			// absence placeholder.
+			bals := ReadAccessListRLP(nfdb, hash, number)
+
+>>>>>>> geth-v1.17.9
 			// Write to the batch.
 			if err := op.AppendRaw(ChainFreezerHashTable, number, hash[:]); err != nil {
 				return fmt.Errorf("can't write hash to Freezer: %v", err)
@@ -486,6 +502,7 @@ func (f *chainFreezer) freezeRange(nfdb *nofreezedb, number, limit uint64) (hash
 			if err := op.AppendRaw(ChainFreezerReceiptTable, number, receipts); err != nil {
 				return fmt.Errorf("can't write receipts to Freezer: %v", err)
 			}
+<<<<<<< HEAD
 			if err := op.AppendRaw(ChainFreezerDifficultyTable, number, td); err != nil {
 				return fmt.Errorf("can't write td to Freezer: %v", err)
 			}
@@ -495,6 +512,12 @@ func (f *chainFreezer) freezeRange(nfdb *nofreezedb, number, limit uint64) (hash
 				}
 			}
 
+||||||| 117e067f0f
+=======
+			if err := op.AppendRaw(ChainFreezerBALTable, number, bals); err != nil {
+				return fmt.Errorf("can't write bals to Freezer: %v", err)
+			}
+>>>>>>> geth-v1.17.9
 			hashes = append(hashes, hash)
 		}
 		return nil
@@ -560,7 +583,11 @@ func (f *chainFreezer) Ancient(kind string, number uint64) ([]byte, error) {
 	if chainFreezerTableConfigs[kind].prunable == false {
 		return f.ancients.Ancient(kind, number)
 	}
-	tail, err := f.ancients.Tail()
+	group, err := tableTailGroup(kind)
+	if err != nil {
+		return nil, err
+	}
+	tail, err := f.ancients.Tail(group)
 	if err != nil {
 		return nil, err
 	}
@@ -577,8 +604,18 @@ func (f *chainFreezer) Ancient(kind string, number uint64) ([]byte, error) {
 		return f.eradb.GetRawBody(number)
 	case ChainFreezerReceiptTable:
 		return f.eradb.GetRawReceipts(number)
+	case ChainFreezerBALTable:
+		return nil, errOutOfBounds
 	}
 	return nil, errUnknownTable
+}
+
+// tableTailGroup returns the tail group identifier for a chain freezer table.
+func tableTailGroup(kind string) (string, error) {
+	if cfg, ok := chainFreezerTableConfigs[kind]; ok {
+		return cfg.tailGroup, nil
+	}
+	return "", errUnknownTable
 }
 
 // ReadAncients executes an operation while preventing mutations to the freezer,
@@ -597,8 +634,8 @@ func (f *chainFreezer) Ancients() (uint64, error) {
 	return f.ancients.Ancients()
 }
 
-func (f *chainFreezer) Tail() (uint64, error) {
-	return f.ancients.Tail()
+func (f *chainFreezer) Tail(group string) (uint64, error) {
+	return f.ancients.Tail(group)
 }
 
 func (f *chainFreezer) AncientSize(kind string) (uint64, error) {
@@ -621,8 +658,8 @@ func (f *chainFreezer) TruncateHead(items uint64) (uint64, error) {
 	return f.ancients.TruncateHead(items)
 }
 
-func (f *chainFreezer) TruncateTail(items uint64) (uint64, error) {
-	return f.ancients.TruncateTail(items)
+func (f *chainFreezer) TruncateTail(group string, items uint64) (uint64, error) {
+	return f.ancients.TruncateTail(group, items)
 }
 
 func (f *chainFreezer) TruncateTableTail(kind string, tail uint64) (uint64, error) {

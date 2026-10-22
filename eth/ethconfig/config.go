@@ -54,7 +54,7 @@ var FullNodeGPO = gasprice.Config{
 
 // Defaults contains default settings for use on the BSC main net.
 var Defaults = Config{
-	HistoryMode:             history.KeepAll,
+	HistoryMode:             history.HistoryPolicy{Mode: history.KeepAll},
 	SyncMode:                SnapSync,
 	NetworkId:               0, // enable auto configuration of networkID == chainID
 	TxLookupLimit:           2350000,
@@ -78,9 +78,20 @@ var Defaults = Config{
 	RPCGasCap:               50000000,
 	RPCEVMTimeout:           5 * time.Second,
 	GPO:                     FullNodeGPO,
+<<<<<<< HEAD
 	RPCTxFeeCap:             1,
 	TxSyncDefaultTimeout:    5 * time.Second,
 	TxSyncMaxTimeout:        10 * time.Second,
+||||||| 117e067f0f
+	RPCTxFeeCap:             1, // 1 ether
+	TxSyncDefaultTimeout:    20 * time.Second,
+	TxSyncMaxTimeout:        1 * time.Minute,
+=======
+	RPCTxFeeCap:             1, // 1 ether
+	EngineMaxReorgDepth:     32,
+	TxSyncDefaultTimeout:    20 * time.Second,
+	TxSyncMaxTimeout:        1 * time.Minute,
+>>>>>>> geth-v1.17.9
 	SlowBlockThreshold:      -1, // Disabled by default; set via --debug.logslowblock flag
 	RangeLimit:              5000,
 	BlobExtraReserve:        params.DefaultExtraReserveForBlobRequests, // Extra reserve threshold for blob, blob never expires when -1 is set, default 28800
@@ -112,7 +123,7 @@ type Config struct {
 	EVNNodeIDsToAdd        []enode.ID
 	EVNNodeIDsToRemove     []enode.ID
 	// HistoryMode configures chain history retention.
-	HistoryMode history.HistoryMode
+	HistoryMode history.HistoryPolicy
 
 	// This can be set to list of enrtree:// URLs which will be queried for
 	// nodes to connect to.
@@ -121,8 +132,9 @@ type Config struct {
 	BscDiscoveryURLs  []string
 
 	// State options.
-	NoPruning  bool // Whether to disable pruning and flush everything to disk
-	NoPrefetch bool // Whether to disable prefetching and only load state on demand
+	NoPruning         bool // Whether to disable pruning and flush everything to disk
+	NoPrefetch        bool // Whether to disable prefetching and only load state on demand
+	NoPrecompileCache bool // Whether to disable precompile result caching
 
 	DirectBroadcast     bool
 	DisableSnapProtocol bool // Whether disable snap protocol
@@ -218,8 +230,10 @@ type Config struct {
 	// Generate execution witnesses and self-check against them (testing purpose)
 	StatelessSelfValidation bool
 
-	// Enables tracking of state size
-	EnableStateSizeTracking bool
+	// SnapV2 enables the experimental snap/2 (EIP-8189, BAL-based) sync protocol:
+	// the node advertises snap/2 on the wire and uses the snap/2 state syncer.
+	// It is not safe to enable on public networks yet.
+	SnapV2 bool
 
 	// Enables VM tracing
 	VMTrace           string
@@ -235,6 +249,7 @@ type Config struct {
 	// send-transaction variants. The unit is ether.
 	RPCTxFeeCap float64
 
+<<<<<<< HEAD
 	// OverridePassedForkTime
 	OverridePassedForkTime *uint64 `toml:",omitempty"`
 
@@ -247,9 +262,18 @@ type Config struct {
 	// OverrideFermi (TODO: remove after the fork)
 	OverrideFermi *uint64 `toml:",omitempty"`
 
+||||||| 117e067f0f
+=======
+	// EngineMaxReorgDepth is the maximum depth the chain head can be rewound
+	// to an already-canonical ancestor by engine API forkchoiceUpdated calls
+	// (0 = no limit).
+	EngineMaxReorgDepth uint64
+
+>>>>>>> geth-v1.17.9
 	// OverrideOsaka (TODO: remove after the fork)
 	OverrideOsaka *uint64 `toml:",omitempty"`
 
+<<<<<<< HEAD
 	// OverrideMendel (TODO: remove after the fork)
 	OverrideMendel *uint64 `toml:",omitempty"`
 
@@ -259,6 +283,12 @@ type Config struct {
 	// OverrideJenner (TODO: remove after the fork)
 	OverrideJenner *uint64 `toml:",omitempty"`
 
+||||||| 117e067f0f
+=======
+	// OverrideAmsterdam (TODO: remove after the fork)
+	OverrideAmsterdam *uint64 `toml:",omitempty"`
+
+>>>>>>> geth-v1.17.9
 	// OverrideBPO1 (TODO: remove after the fork)
 	OverrideBPO1 *uint64 `toml:",omitempty"`
 

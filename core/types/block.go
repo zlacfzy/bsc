@@ -131,7 +131,7 @@ type Header struct {
 	RequestsHash *common.Hash `json:"requestsHash" rlp:"optional"`
 
 	// BlockAccessListHash was added by EIP-7928 and is ignored in legacy headers.
-	BlockAccessListHash *common.Hash `json:"balHash" rlp:"optional"`
+	BlockAccessListHash *common.Hash `json:"blockAccessListHash" rlp:"optional"`
 
 	// SlotNumber was added by EIP-7843 and is ignored in legacy headers.
 	SlotNumber *uint64 `json:"slotNumber" rlp:"optional"`
@@ -465,8 +465,9 @@ func (b *Block) BaseFee() *big.Int {
 	return new(big.Int).Set(b.header.BaseFee)
 }
 
-func (b *Block) BeaconRoot() *common.Hash   { return b.header.ParentBeaconRoot }
-func (b *Block) RequestsHash() *common.Hash { return b.header.RequestsHash }
+func (b *Block) BeaconRoot() *common.Hash          { return b.header.ParentBeaconRoot }
+func (b *Block) RequestsHash() *common.Hash        { return b.header.RequestsHash }
+func (b *Block) BlockAccessListHash() *common.Hash { return b.header.BlockAccessListHash }
 
 func (b *Block) ExcessBlobGas() *uint64 {
 	var excessBlobGas *uint64

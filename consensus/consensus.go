@@ -107,13 +107,21 @@ type Engine interface {
 	// rules of a particular engine. The changes are executed inline.
 	Prepare(chain ChainHeaderReader, header *types.Header) error
 
-	// Finalize runs any post-transaction state modifications (e.g. block rewards
-	// or process withdrawals) but does not assemble the block.
+	// Finalize runs any post-transaction consensus-specific state modifications
+	// (e.g. block rewards) but does not assemble the block.
 	//
 	// Note: The state database might be updated to reflect any consensus rules
 	// that happen at finalization (e.g. block rewards).
+<<<<<<< HEAD
 	Finalize(chain ChainHeaderReader, header *types.Header, state vm.StateDB, txs *[]*types.Transaction,
 		uncles []*types.Header, withdrawals []*types.Withdrawal, receipts *[]*types.Receipt, systemTxs *[]*types.Transaction, usedGas *uint64, tracer *tracing.Hooks) error
+||||||| 117e067f0f
+	Finalize(chain ChainHeaderReader, header *types.Header, state vm.StateDB, body *types.Body)
+=======
+	//
+	// TODO(rjl) Integrate the state mutation into core.PostExecution.
+	Finalize(chain ChainHeaderReader, header *types.Header, state vm.StateDB, body *types.Body)
+>>>>>>> geth-v1.17.9
 
 	// Seal generates a new sealing request for the given input block and pushes
 	// the result into the given channel.

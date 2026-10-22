@@ -78,9 +78,11 @@ type StateDB interface {
 
 	AddressInAccessList(addr common.Address) bool
 	SlotInAccessList(addr common.Address, slot common.Hash) (addressOk bool, slotOk bool)
+
 	// AddAddressToAccessList adds the given address to the access list. This operation is safe to perform
 	// even if the feature/fork is not active yet
 	AddAddressToAccessList(addr common.Address)
+
 	// AddSlotToAccessList adds the given (address,slot) to the access list. This operation is safe to perform
 	// even if the feature/fork is not active yet
 	AddSlotToAccessList(addr common.Address, slot common.Hash)
@@ -96,8 +98,13 @@ type StateDB interface {
 	NoTries() bool
 
 	AddLog(*types.Log)
+<<<<<<< HEAD
 	GetLogs(hash common.Hash, blockNumber uint64, blockHash common.Hash, blockTime uint64) []*types.Log
 	LogsForBurnAccounts() []*types.Log
+||||||| 117e067f0f
+	LogsForBurnAccounts() []*types.Log
+=======
+>>>>>>> geth-v1.17.9
 	AddPreimage(common.Hash, []byte)
 
 	Witness() *stateless.Witness
@@ -105,6 +112,13 @@ type StateDB interface {
 	AccessEvents() *state.AccessEvents
 
 	// Finalise must be invoked at the end of a transaction
+<<<<<<< HEAD
 	Finalise(bool) *bal.StateAccessList
 	IntermediateRoot(deleteEmptyObjects bool) common.Hash
+||||||| 117e067f0f
+	Finalise(bool) *bal.StateAccessList
+=======
+	Finalise(rules params.Rules) *bal.ConstructionBlockAccessList
+	SetTxContext(thash common.Hash, ti int, blockAccessIndex uint32)
+>>>>>>> geth-v1.17.9
 }

@@ -34,6 +34,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/core/tracing"
 	"github.com/ethereum/go-ethereum/core/txpool"
+	"github.com/ethereum/go-ethereum/core/txpool/blobpool"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -62,7 +63,10 @@ var (
 // Its goal is to get around setting up a valid statedb for the balance and nonce
 // checks.
 type testTxPool struct {
-	pool map[common.Hash]*types.Transaction // Hash map of collected transactions
+	txPool   map[common.Hash]*types.Transaction // Hash map of collected transactions
+	cellPool map[common.Hash][]kzg4844.Cell
+
+	custody map[common.Hash]types.CustodyBitmap
 
 	txFeed event.Feed   // Notification feed to allow waiting for inclusion
 	lock   sync.RWMutex // Protects the transaction pool
@@ -71,7 +75,9 @@ type testTxPool struct {
 // newTestTxPool creates a mock transaction pool.
 func newTestTxPool() *testTxPool {
 	return &testTxPool{
-		pool: make(map[common.Hash]*types.Transaction),
+		txPool:   make(map[common.Hash]*types.Transaction),
+		cellPool: make(map[common.Hash][]kzg4844.Cell),
+		custody:  make(map[common.Hash]types.CustodyBitmap),
 	}
 }
 
@@ -81,7 +87,16 @@ func (p *testTxPool) Has(hash common.Hash) bool {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
-	return p.pool[hash] != nil
+	return p.txPool[hash] != nil
+}
+
+// Has returns an indicator whether txpool has a transaction
+// cached with the given hash.
+func (p *testTxPool) HasPayload(hash common.Hash) bool {
+	p.lock.Lock()
+	defer p.lock.Unlock()
+
+	return p.cellPool[hash] != nil
 }
 
 // Get retrieves the transaction from local txpool with given
@@ -89,16 +104,16 @@ func (p *testTxPool) Has(hash common.Hash) bool {
 func (p *testTxPool) Get(hash common.Hash) *types.Transaction {
 	p.lock.Lock()
 	defer p.lock.Unlock()
-	return p.pool[hash]
+	return p.txPool[hash]
 }
 
 // Get retrieves the transaction from local txpool with given
 // tx hash.
-func (p *testTxPool) GetRLP(hash common.Hash) []byte {
+func (p *testTxPool) GetRLP(hash common.Hash, _ uint) []byte {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
-	tx := p.pool[hash]
+	tx := p.txPool[hash]
 	if tx != nil {
 		blob, _ := rlp.EncodeToBytes(tx)
 		return blob
@@ -112,7 +127,7 @@ func (p *testTxPool) GetMetadata(hash common.Hash) *txpool.TxMetadata {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
-	tx := p.pool[hash]
+	tx := p.txPool[hash]
 	if tx != nil {
 		return &txpool.TxMetadata{
 			Type: tx.Type(),
@@ -129,7 +144,7 @@ func (p *testTxPool) Add(txs []*types.Transaction, sync bool) []error {
 	defer p.lock.Unlock()
 
 	for _, tx := range txs {
-		p.pool[tx.Hash()] = tx
+		p.txPool[tx.Hash()] = tx
 	}
 	p.txFeed.Send(core.NewTxsEvent{Txs: txs})
 	return make([]error, len(txs))
@@ -142,7 +157,7 @@ func (p *testTxPool) Pending(filter txpool.PendingFilter) (map[common.Address][]
 
 	var count int
 	batches := make(map[common.Address][]*types.Transaction)
-	for _, tx := range p.pool {
+	for _, tx := range p.txPool {
 		from, _ := types.Sender(types.HomesteadSigner{}, tx)
 		batches[from] = append(batches[from], tx)
 	}
@@ -172,6 +187,87 @@ func (p *testTxPool) Pending(filter txpool.PendingFilter) (map[common.Address][]
 func (p *testTxPool) SubscribeTransactions(ch chan<- core.NewTxsEvent, reorgs bool) event.Subscription {
 	return p.txFeed.Subscribe(ch)
 }
+func (p *testTxPool) GetBlobHashes(hash common.Hash) []common.Hash {
+	p.lock.RLock()
+	defer p.lock.RUnlock()
+
+	tx, exists := p.txPool[hash]
+	if !exists {
+		return nil
+	}
+	return tx.BlobHashes()
+}
+
+func (p *testTxPool) GetBlobCells(vhashes []common.Hash, mask types.CustodyBitmap) ([][]*kzg4844.Cell, [][]*kzg4844.Proof, error) {
+	p.lock.RLock()
+	defer p.lock.RUnlock()
+
+	requestedIndices := mask.Indices()
+	cells := make([][]*kzg4844.Cell, len(vhashes))
+	proofs := make([][]*kzg4844.Proof, len(vhashes))
+
+	for i, vhash := range vhashes {
+		// Find the tx containing this versioned hash
+		var foundTx *types.Transaction
+		var blobIdx int
+		for _, tx := range p.txPool {
+			for j, bh := range tx.BlobHashes() {
+				if bh == vhash {
+					foundTx = tx
+					blobIdx = j
+					break
+				}
+			}
+			if foundTx != nil {
+				break
+			}
+		}
+		if foundTx == nil {
+			continue
+		}
+		txCells, ok := p.cellPool[foundTx.Hash()]
+		if !ok {
+			continue
+		}
+		_ = blobIdx // cells in the mock are stored flat by cell index
+		blobCells := make([]*kzg4844.Cell, len(requestedIndices))
+		for j, idx := range requestedIndices {
+			if int(idx) < len(txCells) {
+				cell := txCells[idx]
+				blobCells[j] = &cell
+			}
+		}
+		cells[i] = blobCells
+	}
+	return cells, proofs, nil
+}
+
+func (p *testTxPool) GetCustody(hash common.Hash) *types.CustodyBitmap {
+	p.lock.RLock()
+	defer p.lock.RUnlock()
+	mask, ok := p.custody[hash]
+	if !ok {
+		return nil
+	}
+	return &mask
+}
+
+// AddCells adds cells for a specific transaction hash (for testing)
+func (p *testTxPool) AddCells(hash common.Hash, cells []kzg4844.Cell, mask types.CustodyBitmap) {
+	p.lock.Lock()
+	defer p.lock.Unlock()
+	p.cellPool[hash] = cells
+	p.custody[hash] = mask
+}
+
+func (p *testTxPool) AddPooledTx(pooledTx *blobpool.BlobTxForPool) error {
+	p.lock.Lock()
+	defer p.lock.Unlock()
+	hash := pooledTx.Tx.Hash()
+	p.cellPool[hash] = pooledTx.CellSidecar.Cells
+	p.txPool[hash] = pooledTx.Tx
+	return nil
+}
 
 // FilterType should check whether the pool supports the given type of transactions.
 func (p *testTxPool) FilterType(kind byte) bool {
@@ -182,15 +278,32 @@ func (p *testTxPool) FilterType(kind byte) bool {
 	return false
 }
 
+func (p *testTxPool) ValidateTxBasics(_ *types.Transaction) error {
+	return nil
+}
+
 // testHandler is a live implementation of the Ethereum protocol handler, just
 // preinitialized with some sane testing defaults and the transaction pool mocked
 // out.
 type testHandler struct {
+<<<<<<< HEAD
 	db       ethdb.Database
 	chain    *core.BlockChain
 	txpool   *testTxPool
 	votepool *testVotePool
 	handler  *handler
+||||||| 117e067f0f
+	db      ethdb.Database
+	chain   *core.BlockChain
+	txpool  *testTxPool
+	handler *handler
+=======
+	db       ethdb.Database
+	chain    *core.BlockChain
+	txpool   *testTxPool
+	blobpool *testTxPool
+	handler  *handler
+>>>>>>> geth-v1.17.9
 }
 
 // newTestHandler creates a new handler for testing purposes with no blocks.
@@ -220,7 +333,12 @@ func newTestHandlerWithBlocks(blocks int, mode ethconfig.SyncMode) *testHandler 
 		Database:   db,
 		Chain:      chain,
 		TxPool:     txpool,
+<<<<<<< HEAD
 		VotePool:   votepool,
+||||||| 117e067f0f
+=======
+		BlobPool:   txpool,
+>>>>>>> geth-v1.17.9
 		Network:    1,
 		Sync:       mode,
 		BloomCache: 1,
@@ -231,6 +349,7 @@ func newTestHandlerWithBlocks(blocks int, mode ethconfig.SyncMode) *testHandler 
 	handler.Start(1000, 3)
 
 	return &testHandler{
+<<<<<<< HEAD
 		db:       db,
 		chain:    chain,
 		txpool:   txpool,
@@ -345,6 +464,18 @@ func newTestParliaHandlerAfterCancun(t *testing.T, config *params.ChainConfig, m
 		txpool:   txpool,
 		votepool: votepool,
 		handler:  handler,
+||||||| 117e067f0f
+		db:      db,
+		chain:   chain,
+		txpool:  txpool,
+		handler: handler,
+=======
+		db:       db,
+		chain:    chain,
+		txpool:   txpool,
+		blobpool: txpool,
+		handler:  handler,
+>>>>>>> geth-v1.17.9
 	}
 }
 
@@ -525,7 +656,13 @@ func createTestPeers(rand *rand.Rand, n int) []*ethPeer {
 		var id enode.ID
 		rand.Read(id[:])
 		p2pPeer := p2p.NewPeer(id, "test", nil)
+<<<<<<< HEAD
 		ep := eth.NewPeer(eth.ETH68, p2pPeer, nil, nil, nil)
+||||||| 117e067f0f
+		ep := eth.NewPeer(eth.ETH69, p2pPeer, nil, nil, nil)
+=======
+		ep := eth.NewPeer(eth.ETH69, p2pPeer, nil, nil, nil, nil)
+>>>>>>> geth-v1.17.9
 		peers[i] = &ethPeer{Peer: ep}
 	}
 	return peers

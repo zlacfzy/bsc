@@ -47,7 +47,7 @@ func TestLoopInterrupt(t *testing.T) {
 		statedb, _ := state.New(types.EmptyRootHash, state.NewDatabaseForTesting())
 		statedb.CreateAccount(address)
 		statedb.SetCode(address, common.Hex2Bytes(tt), tracing.CodeChangeUnspecified)
-		statedb.Finalise(true)
+		statedb.Finalise(params.Rules{IsEIP158: true})
 
 		evm := NewEVM(vmctx, statedb, params.AllEthashProtocolChanges, Config{})
 
@@ -55,7 +55,7 @@ func TestLoopInterrupt(t *testing.T) {
 		timeout := make(chan bool)
 
 		go func(evm *EVM) {
-			_, _, err := evm.Call(common.Address{}, address, nil, NewGasBudget(math.MaxUint64), new(uint256.Int))
+			_, _, err := evm.Call(common.Address{}, address, nil, NewGasBudget(math.MaxUint64, 0), new(uint256.Int))
 			errChannel <- err
 		}(evm)
 
@@ -85,7 +85,13 @@ func BenchmarkInterpreter(b *testing.B) {
 		value             = uint256.NewInt(0)
 		stack             = newStackForTesting()
 		mem               = NewMemory()
+<<<<<<< HEAD
 		contract          = GetContract(common.Address{}, common.Address{}, value, NewGasBudget(startGas), nil)
+||||||| 117e067f0f
+		contract          = NewContract(common.Address{}, common.Address{}, value, NewGasBudget(startGas), nil)
+=======
+		contract          = NewContract(common.Address{}, common.Address{}, value, NewGasBudget(startGas, 0), nil)
+>>>>>>> geth-v1.17.9
 	)
 	stack.push(uint256.NewInt(123))
 	stack.push(uint256.NewInt(123))

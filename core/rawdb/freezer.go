@@ -60,8 +60,8 @@ const freezerTableSize = 2 * 1000 * 1000 * 1000
 // - The in-order data ensures that disk reads are always optimized.
 type Freezer struct {
 	datadir string
-	head    atomic.Uint64 // Number of items stored (including items removed from tail)
-	tail    atomic.Uint64 // Number of the first stored item in the freezer
+	head    atomic.Uint64             // Number of items stored (including items removed from tail)
+	tails   map[string]*atomic.Uint64 // Per-group tail cache, keyed by tail group name
 
 	// This lock synchronizes writers and the truncate operation, as well as
 	// the "atomic" (batched) read operations.
@@ -77,9 +77,19 @@ type Freezer struct {
 // NewFreezer creates a freezer instance for maintaining immutable ordered
 // data according to the given parameters.
 //
+<<<<<<< HEAD
 // The 'tables' argument defines the data tables. If the value of a map
 // entry is true, snappy compression is disabled for the table.
 // additionTables indicates the new add tables for freezerDB, it has some special rules.
+||||||| 117e067f0f
+// The 'tables' argument defines the freezer tables and their configuration.
+// Each value is a freezerTableConfig specifying whether snappy compression is
+// disabled (noSnappy) and whether the table is prunable (prunable).
+=======
+// The 'tables' argument defines the freezer tables and their configuration.
+// Each value is a freezerTableConfig describing whether Snappy compression
+// is disabled (noSnappy) and which tail group the table belongs to.
+>>>>>>> geth-v1.17.9
 func NewFreezer(datadir string, namespace string, readonly bool, maxTableSize uint32, tables map[string]freezerTableConfig) (*Freezer, error) {
 	// Create the initial freezer object
 	var (
@@ -119,6 +129,7 @@ func NewFreezer(datadir string, namespace string, readonly bool, maxTableSize ui
 		datadir:      datadir,
 		readonly:     readonly,
 		tables:       make(map[string]*freezerTable),
+		tails:        make(map[string]*atomic.Uint64),
 		instanceLock: lock,
 	}
 
@@ -239,6 +250,7 @@ func (f *Freezer) Ancients() (uint64, error) {
 	return f.head.Load(), nil
 }
 
+<<<<<<< HEAD
 func (f *Freezer) TableAncients(kind string) (uint64, error) {
 	f.writeLock.RLock()
 	defer f.writeLock.RUnlock()
@@ -248,6 +260,25 @@ func (f *Freezer) TableAncients(kind string) (uint64, error) {
 // Tail returns the number of first stored item in the freezer.
 func (f *Freezer) Tail() (uint64, error) {
 	return f.tail.Load(), nil
+||||||| 117e067f0f
+// Tail returns the number of first stored item in the freezer.
+func (f *Freezer) Tail() (uint64, error) {
+	return f.tail.Load(), nil
+=======
+// Tail returns the lowest accessible item index for the given tail group.
+// All tables sharing this group agree on the tail; an empty group name
+// refers to non-prunable tables and always returns 0. Unknown groups return
+// an error.
+func (f *Freezer) Tail(group string) (uint64, error) {
+	if group == "" {
+		return 0, nil
+	}
+	tail, ok := f.tails[group]
+	if !ok {
+		return 0, fmt.Errorf("unknown tail group: %q", group)
+	}
+	return tail.Load(), nil
+>>>>>>> geth-v1.17.9
 }
 
 // AncientSize returns the ancient size of the specified category.
@@ -319,6 +350,7 @@ func (f *Freezer) TruncateHead(items uint64) (uint64, error) {
 	if oitems <= items {
 		return oitems, nil
 	}
+<<<<<<< HEAD
 	for kind, table := range f.tables {
 		err := table.truncateHead(items)
 		if err == errTruncationBelowTail {
@@ -336,26 +368,73 @@ func (f *Freezer) TruncateHead(items uint64) (uint64, error) {
 			continue
 		}
 		if err != nil {
+||||||| 117e067f0f
+	for _, table := range f.tables {
+		if err := table.truncateHead(items); err != nil {
+=======
+	// Tail groups are pruned independently, so their tails can differ. Cutting
+	// the head below the tail of one group is fine: that group simply retains
+	// nothing, while the groups with a lower tail keep their data. Cutting below
+	// every group's tail is not, as it discards data that no group had pruned.
+	// Reject that up front.
+	if lowest := f.lowestTail(); items < lowest {
+		return 0, fmt.Errorf("truncation below tail: head %d, lowest group tail %d", items, lowest)
+	}
+	for _, table := range f.tables {
+		if err := table.truncateHead(items); err != nil {
+>>>>>>> geth-v1.17.9
 			return 0, err
 		}
 	}
 	f.head.Store(items)
+
+	// A group whose tail sat above the new head has been reset down to it by the
+	// truncation above, so the cached tail has to follow.
+	for _, tail := range f.tails {
+		if tail.Load() > items {
+			tail.Store(items)
+		}
+	}
 	return oitems, nil
 }
 
-// TruncateTail discards all data below the specified threshold. Note that only
-// 'prunable' tables will be truncated.
-func (f *Freezer) TruncateTail(tail uint64) (uint64, error) {
+// lowestTail returns the smallest tail among the tail groups.
+func (f *Freezer) lowestTail() uint64 {
+	var (
+		lowest uint64
+		first  = true
+	)
+	for _, tail := range f.tails {
+		if v := tail.Load(); first || v < lowest {
+			lowest, first = v, false
+		}
+	}
+	return lowest
+}
+
+// TruncateTail discards all data below the specified threshold across every
+// table that belongs to the named tail group. Tables that are already past
+// the threshold are left untouched. The previous tail of the group is
+// returned. An empty group name or an unknown group name returns an error.
+func (f *Freezer) TruncateTail(group string, tail uint64) (uint64, error) {
 	if f.readonly {
 		return 0, errReadOnly
+	}
+	if group == "" {
+		return 0, errors.New("empty tail group")
+	}
+	cached, ok := f.tails[group]
+	if !ok {
+		return 0, fmt.Errorf("unknown tail group: %q", group)
 	}
 	f.writeLock.Lock()
 	defer f.writeLock.Unlock()
 
-	old := f.tail.Load()
-	if old >= tail {
-		return old, nil
+	prev := cached.Load()
+	if prev >= tail {
+		return prev, nil
 	}
+<<<<<<< HEAD
 	for kind, table := range f.tables {
 		if slices.Contains(additionTables, kind) && EmptyTable(table) {
 			continue
@@ -364,19 +443,36 @@ func (f *Freezer) TruncateTail(tail uint64) (uint64, error) {
 			if err := table.truncateTail(tail); err != nil {
 				return 0, err
 			}
+||||||| 117e067f0f
+	for _, table := range f.tables {
+		if table.config.prunable {
+			if err := table.truncateTail(tail); err != nil {
+				return 0, err
+			}
+=======
+	for _, table := range f.tables {
+		if table.config.tailGroup != group {
+			continue
+		}
+		if err := table.truncateTail(tail); err != nil {
+			return 0, err
+>>>>>>> geth-v1.17.9
 		}
 	}
-	f.tail.Store(tail)
+	cached.Store(tail)
 
-	// Update the head if the requested tail exceeds the current head
+	// Update the head if the requested tail exceeds the current head.
 	if f.head.Load() < tail {
 		f.head.Store(tail)
 	}
-	return old, nil
+	return prev, nil
 }
 
 // SyncAncient flushes all data tables to disk.
 func (f *Freezer) SyncAncient() error {
+	f.writeLock.RLock()
+	defer f.writeLock.RUnlock()
+
 	var errs []error
 	for _, table := range f.tables {
 		if err := table.Sync(); err != nil {
@@ -389,16 +485,18 @@ func (f *Freezer) SyncAncient() error {
 	return nil
 }
 
-// validate checks that every table has the same boundary.
-// Used instead of `repair` in readonly mode.
+// validate checks that every table has the same head and that tables sharing
+// a tail group also share a tail. Used instead of `repair` in readonly mode.
 func (f *Freezer) validate() error {
 	if len(f.tables) == 0 {
 		return nil
 	}
 	var (
-		head       uint64
-		prunedTail *uint64
+		head    uint64
+		headSet bool
+		tails   = make(map[string]uint64)
 	)
+<<<<<<< HEAD
 	// Hack to get boundary of any table
 	for kind, table := range f.tables {
 		// addition tables is special cases
@@ -408,7 +506,16 @@ func (f *Freezer) validate() error {
 		head = table.items.Load()
 		break
 	}
+||||||| 117e067f0f
+	// get any head value
+	for _, table := range f.tables {
+		head = table.items.Load()
+		break
+	}
+=======
+>>>>>>> geth-v1.17.9
 	for kind, table := range f.tables {
+<<<<<<< HEAD
 		// check addition tables, try to align with exist tables
 		if slices.Contains(additionTables, kind) {
 			// if the table is empty, just skip
@@ -428,40 +535,69 @@ func (f *Freezer) validate() error {
 		// all tables have to have the same head
 		if head != table.items.Load() {
 			return fmt.Errorf("freezer table %s has a differing head: %d != %d", kind, table.items.Load(), head)
+||||||| 117e067f0f
+		// all tables have to have the same head
+		if head != table.items.Load() {
+			return fmt.Errorf("freezer table %s has a differing head: %d != %d", kind, table.items.Load(), head)
+=======
+		// A freshly added table is empty and has not yet been aligned to the
+		// common head, skip the error here.
+		//
+		// Tradeoff:
+		// It loosens corruption detection slightly: a table that lost its data
+		// and now reports items == 0 would be treated as "freshly added" rather
+		// than flagged. It's the tradeoff we accept.
+		items := table.items.Load()
+		if items == 0 {
+			continue
+>>>>>>> geth-v1.17.9
 		}
-		if !table.config.prunable {
-			// non-prunable tables have to start at 0
+		// Validate the table head
+		if !headSet {
+			head = items
+			headSet = true
+		} else if items != head {
+			return fmt.Errorf("freezer table %s has a differing head: %d != %d", kind, items, head)
+		}
+		// Validate the table tail
+		if table.config.tailGroup == "" {
 			if table.itemHidden.Load() != 0 {
 				return fmt.Errorf("non-prunable freezer table '%s' has a non-zero tail: %d", kind, table.itemHidden.Load())
 			}
+			continue
+		}
+		hidden := table.itemHidden.Load()
+		if t, ok := tails[table.config.tailGroup]; ok {
+			if t != hidden {
+				return fmt.Errorf("freezer table %s has differing tail in group %q: %d != %d", kind, table.config.tailGroup, hidden, t)
+			}
 		} else {
-			// prunable tables have to have the same length
-			if prunedTail == nil {
-				tmp := table.itemHidden.Load()
-				prunedTail = &tmp
-			}
-			if *prunedTail != table.itemHidden.Load() {
-				return fmt.Errorf("freezer table %s has differing tail: %d != %d", kind, table.itemHidden.Load(), *prunedTail)
-			}
+			tails[table.config.tailGroup] = hidden
 		}
 	}
-
-	if prunedTail == nil {
-		tmp := uint64(0)
-		prunedTail = &tmp
-	}
-
 	f.head.Store(head)
-	f.tail.Store(*prunedTail)
+
+	for group, tail := range tails {
+		counter := new(atomic.Uint64)
+		counter.Store(tail)
+		f.tails[group] = counter
+	}
 	return nil
 }
 
-// repair truncates all data tables to the same length.
+// repair brings every table into a consistent state. The common head is taken
+// as the minimum item count among non-empty tables; freshly added empty tables
+// are fast-forwarded to that head via tail truncation. Within each tail group
+// the maximum tail wins, and prunable tables are truncated to it.
 func (f *Freezer) repair() error {
+	// Determine the common head from non-empty tables. Empty tables are
+	// excluded so that a freshly added table cannot drag the existing head
+	// down to zero on first cold-start.
 	var (
-		head       = uint64(math.MaxUint64)
-		prunedTail = uint64(0)
+		hasNonEmpty bool
+		head        uint64 = math.MaxUint64
 	)
+<<<<<<< HEAD
 	for kind, table := range f.tables {
 		// addition tables only align head
 		if slices.Contains(additionTables, kind) {
@@ -473,7 +609,23 @@ func (f *Freezer) repair() error {
 		}
 		head = min(head, table.items.Load())
 		prunedTail = max(prunedTail, table.itemHidden.Load())
+||||||| 117e067f0f
+	// get the minimal head and the maximum tail
+	for _, table := range f.tables {
+		head = min(head, table.items.Load())
+		prunedTail = max(prunedTail, table.itemHidden.Load())
+=======
+	for _, table := range f.tables {
+		if table.items.Load() == 0 {
+			continue
+		}
+		if items := table.items.Load(); items < head {
+			head = items
+		}
+		hasNonEmpty = true
+>>>>>>> geth-v1.17.9
 	}
+<<<<<<< HEAD
 	for kind, table := range f.tables {
 		//  try to align with exist tables, skip empty table
 		if slices.Contains(additionTables, kind) && EmptyTable(table) {
@@ -496,23 +648,64 @@ func (f *Freezer) repair() error {
 			continue
 		}
 		if err != nil {
-			return err
-		}
-		if !table.config.prunable {
-			// non-prunable tables have to start at 0
-			if table.itemHidden.Load() != 0 {
-				panic(fmt.Sprintf("non-prunable freezer table %s has non-zero tail: %v", kind, table.itemHidden.Load()))
-			}
-		} else {
-			// prunable tables have to have the same length
-			if err := table.truncateTail(prunedTail); err != nil {
-				return err
+||||||| 117e067f0f
+	// apply the pruning
+	for kind, table := range f.tables {
+		// all tables need to have the same head
+		if err := table.truncateHead(head); err != nil {
+=======
+	if !hasNonEmpty {
+		head = 0
+	}
+	// Align newly added empty tables to the common head. truncateTail
+	// internally calls resetTo when the requested tail exceeds the current
+	// head, which is exactly what we need here.
+	if head > 0 {
+		for _, table := range f.tables {
+			if table.items.Load() == 0 {
+				if err := table.truncateTail(head); err != nil {
+					return err
+				}
 			}
 		}
 	}
-
+	// Truncate every table to the common head.
+	for _, table := range f.tables {
+		if err := table.truncateHead(head); err != nil {
+>>>>>>> geth-v1.17.9
+			return err
+		}
+	}
+	// Per-group tail alignment: take the maximum tail in each group and apply
+	// it to all members. Non-prunable tables must remain at tail 0.
+	tails := make(map[string]uint64)
+	for kind, table := range f.tables {
+		if table.config.tailGroup == "" {
+			if table.itemHidden.Load() != 0 {
+				panic(fmt.Sprintf("non-prunable freezer table %s has non-zero tail: %v", kind, table.itemHidden.Load()))
+			}
+			continue
+		}
+		hidden := table.itemHidden.Load()
+		if t, ok := tails[table.config.tailGroup]; !ok || hidden > t {
+			tails[table.config.tailGroup] = hidden
+		}
+	}
+	for _, table := range f.tables {
+		if table.config.tailGroup == "" {
+			continue
+		}
+		if err := table.truncateTail(tails[table.config.tailGroup]); err != nil {
+			return err
+		}
+	}
 	f.head.Store(head)
-	f.tail.Store(prunedTail)
+
+	for group, tail := range tails {
+		counter := new(atomic.Uint64)
+		counter.Store(tail)
+		f.tails[group] = counter
+	}
 	return nil
 }
 

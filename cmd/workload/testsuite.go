@@ -122,7 +122,7 @@ func validateHistoryPruneErr(err error, blockNum uint64, historyPruneBlock *uint
 
 func testConfigFromCLI(ctx *cli.Context) (cfg testConfig) {
 	flags.CheckExclusive(ctx, testMainnetFlag, testSepoliaFlag)
-	if (ctx.IsSet(testMainnetFlag.Name) || ctx.IsSet(testSepoliaFlag.Name)) && ctx.IsSet(filterQueryFileFlag.Name) {
+	if (ctx.Bool(testMainnetFlag.Name) || ctx.Bool(testSepoliaFlag.Name)) && ctx.IsSet(filterQueryFileFlag.Name) {
 		exit(filterQueryFileFlag.Name + " cannot be used with " + testMainnetFlag.Name + " or " + testSepoliaFlag.Name)
 	}
 
@@ -155,9 +155,67 @@ func testConfigFromCLI(ctx *cli.Context) (cfg testConfig) {
 		}
 
 		cfg.historyPruneBlock = new(uint64)
-		if p, err := history.NewPolicy(history.KeepPostMerge, params.MainnetGenesisHash); err == nil {
+		if p, err := (history.HistoryPolicy{Mode: history.KeepPostMerge}).Resolve(params.MainnetGenesisHash); err == nil {
 			*cfg.historyPruneBlock = p.Target.BlockNumber
 		}
+<<<<<<< HEAD
+||||||| 117e067f0f
+	case ctx.Bool(testSepoliaFlag.Name):
+		cfg.fsys = builtinTestFiles
+		if ctx.IsSet(filterQueryFileFlag.Name) {
+			cfg.filterQueryFile = ctx.String(filterQueryFileFlag.Name)
+		} else {
+			cfg.filterQueryFile = "queries/filter_queries_sepolia.json"
+		}
+		if ctx.IsSet(historyTestFileFlag.Name) {
+			cfg.historyTestFile = ctx.String(historyTestFileFlag.Name)
+		} else {
+			cfg.historyTestFile = "queries/history_sepolia.json"
+		}
+		if ctx.IsSet(traceTestFileFlag.Name) {
+			cfg.traceTestFile = ctx.String(traceTestFileFlag.Name)
+		} else {
+			cfg.traceTestFile = "queries/trace_sepolia.json"
+		}
+		if ctx.IsSet(proofTestFileFlag.Name) {
+			cfg.proofTestFile = ctx.String(proofTestFileFlag.Name)
+		} else {
+			cfg.proofTestFile = "queries/proof_sepolia.json"
+		}
+
+		cfg.historyPruneBlock = new(uint64)
+		if p, err := history.NewPolicy(history.KeepPostMerge, params.SepoliaGenesisHash); err == nil {
+			*cfg.historyPruneBlock = p.Target.BlockNumber
+		}
+=======
+	case ctx.Bool(testSepoliaFlag.Name):
+		cfg.fsys = builtinTestFiles
+		if ctx.IsSet(filterQueryFileFlag.Name) {
+			cfg.filterQueryFile = ctx.String(filterQueryFileFlag.Name)
+		} else {
+			cfg.filterQueryFile = "queries/filter_queries_sepolia.json"
+		}
+		if ctx.IsSet(historyTestFileFlag.Name) {
+			cfg.historyTestFile = ctx.String(historyTestFileFlag.Name)
+		} else {
+			cfg.historyTestFile = "queries/history_sepolia.json"
+		}
+		if ctx.IsSet(traceTestFileFlag.Name) {
+			cfg.traceTestFile = ctx.String(traceTestFileFlag.Name)
+		} else {
+			cfg.traceTestFile = "queries/trace_sepolia.json"
+		}
+		if ctx.IsSet(proofTestFileFlag.Name) {
+			cfg.proofTestFile = ctx.String(proofTestFileFlag.Name)
+		} else {
+			cfg.proofTestFile = "queries/proof_sepolia.json"
+		}
+
+		cfg.historyPruneBlock = new(uint64)
+		if p, err := (history.HistoryPolicy{Mode: history.KeepPostMerge}).Resolve(params.SepoliaGenesisHash); err == nil {
+			*cfg.historyPruneBlock = p.Target.BlockNumber
+		}
+>>>>>>> geth-v1.17.9
 	default:
 		cfg.fsys = os.DirFS(".")
 		cfg.filterQueryFile = ctx.String(filterQueryFileFlag.Name)

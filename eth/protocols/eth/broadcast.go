@@ -22,6 +22,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/gopool"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/crypto/kzg4844"
 )
 
 const (
@@ -150,30 +151,79 @@ func (p *Peer) announceTransactions() {
 				pending      []common.Hash
 				pendingTypes []byte
 				pendingSizes []uint32
+				mask         types.CustodyBitmap
 				size         common.StorageSize
+				processed    = make(map[int]bool)
 			)
 			for count = 0; count < len(queue) && size < maxTxPacketSize; count++ {
 				if meta := p.txpool.GetMetadata(queue[count]); meta != nil {
+					custody := p.blobpool.GetCustody(queue[count])
+					if !announceable(p.version, custody) {
+						// Left in the queue: the fetcher may still complete the set.
+						continue
+					}
+					if custody != nil {
+						// Blob txs should be batched into the same announcement
+						// if they share the same custody.
+						if mask.OneCount() == 0 {
+							// This is the first blob tx in this batch, so use its
+							// custody as a mask in this batch.
+							mask = *custody
+						} else {
+							if mask != *custody {
+								// Leave this in the queue so that it can be included
+								// in a later announcement.
+								continue
+							}
+						}
+					}
 					pending = append(pending, queue[count])
 					pendingTypes = append(pendingTypes, meta.Type)
-					pendingSizes = append(pendingSizes, uint32(meta.Size))
+					if p.version >= ETH72 && meta.SizeWithoutBlob > 0 {
+						pendingSizes = append(pendingSizes, uint32(meta.SizeWithoutBlob))
+					} else {
+						pendingSizes = append(pendingSizes, uint32(meta.Size))
+					}
 					size += common.HashLength
 				}
+				processed[count] = true
 			}
-			// Shift and trim queue
-			queue = queue[:copy(queue, queue[count:])]
+			// Shift and trim queue using processed map
+			var remaining []common.Hash
+			for i, h := range queue {
+				if !processed[i] {
+					remaining = append(remaining, h)
+				}
+			}
+			queue = remaining
 
 			// If there's anything available to transfer, fire up an async writer
 			if len(pending) > 0 {
 				done = make(chan struct{})
+<<<<<<< HEAD
 				gopool.Submit(func() {
 					if err := p.sendPooledTransactionHashes(pending, pendingTypes, pendingSizes); err != nil {
+||||||| 117e067f0f
+				go func() {
+					if err := p.sendPooledTransactionHashes(pending, pendingTypes, pendingSizes); err != nil {
+=======
+				go func() {
+					if err := p.sendPooledTransactionHashes(pending, pendingTypes, pendingSizes, mask); err != nil {
+>>>>>>> geth-v1.17.9
 						fail <- err
 						return
 					}
 					close(done)
+<<<<<<< HEAD
 					//p.Log().Trace("Sent transaction announcements", "count", len(pending))
 				})
+||||||| 117e067f0f
+					p.Log().Trace("Sent transaction announcements", "count", len(pending))
+				}()
+=======
+					p.Log().Trace("Sent transaction announcements", "count", len(pending), "mask", mask, "tx", pending)
+				}()
+>>>>>>> geth-v1.17.9
 			}
 		}
 		// Transfer goroutine may or may not have been started, listen for events
@@ -203,4 +253,9 @@ func (p *Peer) announceTransactions() {
 			return
 		}
 	}
+}
+
+// announceable reports whether the peer can retrieve the transaction.
+func announceable(version uint, custody *types.CustodyBitmap) bool {
+	return version >= ETH72 || custody == nil || custody.OneCount() >= kzg4844.DataPerBlob
 }
