@@ -501,36 +501,8 @@ func decodeStorageKey(s string) (h common.Hash, inputLength int, err error) {
 //   - When number is -3 the chain finalized header is returned.
 //   - When number is -4 the chain safe header is returned.
 //
-// Per the specification, the result is null for the pending tag and for a
-// safe or finalized tag that cannot be resolved to a block.
+// An unavailable safe or finalized header returns null. BSC retains pending headers.
 func (api *BlockChainAPI) GetHeaderByNumber(ctx context.Context, number rpc.BlockNumber) (map[string]interface{}, error) {
-<<<<<<< HEAD
-	header, err := api.b.HeaderByNumber(ctx, number)
-	if header != nil && err == nil {
-		response := api.rpcMarshalHeader(ctx, header)
-		if number == rpc.PendingBlockNumber {
-			// Pending header need to nil out a few fields
-			for _, field := range []string{"hash", "nonce", "miner"} {
-				response[field] = nil
-			}
-		}
-		return response, err
-||||||| 117e067f0f
-	header, err := api.b.HeaderByNumber(ctx, number)
-	if header != nil && err == nil {
-		response := RPCMarshalHeader(header)
-		if number == rpc.PendingBlockNumber {
-			// Pending header need to nil out a few fields
-			for _, field := range []string{"hash", "nonce", "miner"} {
-				response[field] = nil
-			}
-		}
-		return response, err
-=======
-	if number == rpc.PendingBlockNumber {
-		return nil, nil
->>>>>>> geth-v1.17.9
-	}
 	header, err := api.b.HeaderByNumber(ctx, number)
 	if err != nil {
 		if number == rpc.SafeBlockNumber || number == rpc.FinalizedBlockNumber {
@@ -541,7 +513,13 @@ func (api *BlockChainAPI) GetHeaderByNumber(ctx context.Context, number rpc.Bloc
 	if header == nil {
 		return nil, nil
 	}
-	return RPCMarshalHeader(header), nil
+	response := api.rpcMarshalHeader(ctx, header)
+	if number == rpc.PendingBlockNumber {
+		for _, field := range []string{"hash", "nonce", "miner"} {
+			response[field] = nil
+		}
+	}
+	return response, nil
 }
 
 // GetHeaderByHash returns the requested header by hash.
@@ -1430,10 +1408,10 @@ func (api *BlockChainAPI) replay(ctx context.Context, block *types.Block, accoun
 	evm := vm.NewEVM(core.NewEVMBlockContext(block.Header(), api.b.Chain(), nil), statedb, config, vm.Config{})
 	defer evm.Release()
 	if beaconRoot := block.BeaconRoot(); beaconRoot != nil {
-		core.ProcessBeaconBlockRoot(*beaconRoot, evm) // EIP-4788, a no-op for BSC's zero beacon root
+		core.ProcessBeaconBlockRoot(*beaconRoot, evm, nil) // EIP-4788, a no-op for BSC's zero beacon root
 	}
 	if config.IsPrague(block.Number(), block.Time()) || config.IsUBT(block.Number(), block.Time()) {
-		core.ProcessParentBlockHash(block.ParentHash(), evm) // EIP-2935
+		core.ProcessParentBlockHash(block.ParentHash(), evm, nil) // EIP-2935
 	}
 
 	// Recompute transactions.
@@ -1467,7 +1445,7 @@ func (api *BlockChainAPI) replay(ctx context.Context, block *types.Block, accoun
 
 		if posa, ok := api.b.Engine().(consensus.PoSA); ok {
 			if isSystem, _ := posa.IsSystemTransaction(tx, block.Header()); isSystem {
-				msg.SkipTransactionChecks = true
+				msg.SkipEOACheck().SkipGasLimitCapCheck()
 				balance := statedb.GetBalance(consensus.SystemAddress)
 				if balance.Cmp(common.U2560) > 0 {
 					statedb.SetBalance(consensus.SystemAddress, uint256.NewInt(0), tracing.BalanceChangeUnspecified)
@@ -1484,7 +1462,7 @@ func (api *BlockChainAPI) replay(ctx context.Context, block *types.Block, accoun
 		if _, err := core.ApplyMessage(evm, msg, core.NewGasPool(tx.Gas())); err != nil {
 			return nil, nil, fmt.Errorf("transaction %#x failed: %v", tx.Hash(), err)
 		}
-		statedb.Finalise(evm.ChainConfig().IsEIP158(block.Number()))
+		statedb.Finalise(evm.GetRules())
 
 		if !skip {
 			// Compute account balance diff.

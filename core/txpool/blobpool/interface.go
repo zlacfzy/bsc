@@ -17,8 +17,6 @@
 package blobpool
 
 import (
-	"math/big"
-
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -42,5 +40,5 @@ type BlockChain interface {
 	GetBlock(hash common.Hash, number uint64) *types.Block
 
 	// StateAt returns a state database for a given chain header (generally the head).
-	StateAt(root common.Hash, number *big.Int, time uint64) (*state.StateDB, error)
+	StateAt(head *types.Header) (*state.StateDB, error)
 }

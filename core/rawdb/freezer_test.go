@@ -33,8 +33,8 @@ import (
 
 var (
 	freezerTestTableDef = map[string]freezerTableConfig{"test": {noSnappy: true}}
-	o1o2TableDef        = map[string]freezerTableConfig{"o1": {noSnappy: true, prunable: true}, "o2": {noSnappy: true, prunable: true}}
-	o1o2a1TableDef      = map[string]freezerTableConfig{"o1": {noSnappy: true, prunable: true}, "o2": {noSnappy: true, prunable: true}, "a1": {noSnappy: true, prunable: true}}
+	o1o2TableDef        = map[string]freezerTableConfig{"o1": {noSnappy: true, tailGroup: ChainFreezerBlockDataGroup}, "o2": {noSnappy: true, tailGroup: ChainFreezerBlockDataGroup}}
+	o1o2a1TableDef      = map[string]freezerTableConfig{"o1": {noSnappy: true, tailGroup: ChainFreezerBlockDataGroup}, "o2": {noSnappy: true, tailGroup: ChainFreezerBlockDataGroup}, "a1": {noSnappy: true, tailGroup: "a1"}}
 )
 
 func TestFreezerModify(t *testing.T) {
@@ -494,7 +494,7 @@ func TestFreezer_ResetTailMeta_WithAdditionTable(t *testing.T) {
 	require.Equal(t, item, actual)
 
 	// truncate tail
-	_, err = f.TruncateTail(offset + 2)
+	_, err = f.TruncateTail(ChainFreezerBlockDataGroup, offset+2)
 	require.NoError(t, err)
 	actual, err = f.Ancient("o1", offset+2)
 	require.NoError(t, err)
@@ -557,7 +557,7 @@ func TestFreezer_ResetTailMeta_EmptyTable(t *testing.T) {
 	require.NoError(t, f.SyncAncient())
 
 	// truncate tail
-	_, err = f.TruncateTail(offset + 2)
+	_, err = f.TruncateTail(ChainFreezerBlockDataGroup, offset+2)
 	require.NoError(t, err)
 	actual, err := f.Ancient("o1", offset+2)
 	require.NoError(t, err)

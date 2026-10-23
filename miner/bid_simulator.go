@@ -1071,7 +1071,7 @@ func (b *bidSimulator) simBid(interruptCh chan int32, bidRuntime *BidRuntime) {
 	//	left should not be added with PayBidTxGasUsed, Or right should be not be subtracted with PayBidTxGasLimit
 	// error fix:
 	//	136782406 > 136791878 => false, Or 136807406 > 136816878 => false
-	if bidRuntime.bid.GasUsed > bidRuntime.env.gasPool.Gas() {
+	if bidRuntime.bid.GasUsed > bidRuntime.env.gasPool.Available(bidRuntime.env.evm.GetRules().IsAmsterdam) {
 		err = errors.New("gas used exceeds gas limit")
 		return
 	}
@@ -1087,7 +1087,10 @@ func (b *bidSimulator) simBid(interruptCh chan int32, bidRuntime *BidRuntime) {
 		// Disable tracing for prefetcher executions.
 		vmCfg := *b.chain.GetVMConfig()
 		vmCfg.Tracer = nil
-		go b.bidWorker.getPrefetcher().Prefetch(bidRuntime.bid.Txs, bidRuntime.env.header, gasLimit, throwaway, vmCfg, &interrupt)
+		prefetchHeader := types.CopyHeader(bidRuntime.env.header)
+		prefetchHeader.GasLimit = gasLimit
+		prefetchBlock := types.NewBlockWithHeader(prefetchHeader).WithBody(types.Body{Transactions: bidRuntime.bid.Txs})
+		go b.bidWorker.getPrefetcher().Prefetch(prefetchBlock, throwaway, b.chain.JumpDestCache(), b.chain.PrecompileCache(), vmCfg, &interrupt, new(atomic.Int64))
 	}
 
 	// commit transactions in bid
@@ -1213,7 +1216,7 @@ func (b *bidSimulator) simBid(interruptCh chan int32, bidRuntime *BidRuntime) {
 		return
 	}
 
-	if err = bidRuntime.env.lane.VerifyPackedBid(bidRuntime.env.gasPool.Gas()); err != nil {
+	if err = bidRuntime.env.lane.VerifyPackedBid(bidRuntime.env.gasPool.Available(bidRuntime.env.evm.GetRules().IsAmsterdam)); err != nil {
 		log.Warn("BidSimulator: bid rejected by the payment lane", "builder", bidRuntime.bid.Builder,
 			"bidHash", bidRuntime.bid.Hash(), "err", err)
 		return
@@ -1344,7 +1347,7 @@ func (r *BidRuntime) commitTransaction(chain *core.BlockChain, chainConfig *para
 	)
 
 	// Start executing the transaction
-	r.env.state.SetTxContext(tx.Hash(), r.env.tcount)
+	r.env.state.SetTxContext(tx.Hash(), r.env.tcount, uint32(r.env.tcount+1))
 
 	// if inclusion of the transaction would put the block size over the
 	// maximum we allow, don't add any more txs to the payload.
@@ -1389,12 +1392,13 @@ func (r *BidRuntime) commitTransaction(chain *core.BlockChain, chainConfig *para
 	laneType := env.lane.Classify(tx)
 	usedBefore := env.gasPool.Used()
 
-	receipt, err := core.ApplyTransaction(env.evm, env.gasPool, env.state, env.header, tx, core.NewReceiptBloomGenerator())
+	receipt, txBAL, err := core.ApplyTransaction(context.Background(), env.evm, env.gasPool, env.state, env.header, tx)
 	if err != nil {
 		return err
 	} else if unRevertible && receipt.Status == types.ReceiptStatusFailed {
 		return errors.New("no revertible transaction failed")
 	}
+	env.bal.Merge(txBAL)
 	env.lane.RecordUsedFrom(laneType, env.gasPool, usedBefore)
 	env.header.GasUsed = env.gasPool.Used()
 

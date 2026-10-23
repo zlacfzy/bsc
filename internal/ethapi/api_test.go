@@ -631,7 +631,7 @@ func (b testBackend) StateAndHeaderByNumber(ctx context.Context, number rpc.Bloc
 	if header == nil {
 		return nil, nil, errors.New("header not found")
 	}
-	stateDb, err := b.chain.StateAt(header.Root, header.Number, header.Time)
+	stateDb, err := b.chain.StateAt(header)
 	return stateDb, header, err
 }
 func (b testBackend) StateAndHeaderByNumberOrHash(ctx context.Context, blockNrOrHash rpc.BlockNumberOrHash) (*state.StateDB, *types.Header, error) {
@@ -4962,13 +4962,6 @@ func TestEIP7910Config(t *testing.T) {
 			},
 		}
 	)
-<<<<<<< HEAD
-	gspec := core.DefaultBSCGenesisBlock()
-	gspec.Config = config
-||||||| 117e067f0f
-	gspec := core.DefaultHoodiGenesisBlock()
-	gspec.Config = config
-=======
 	// bpoConfig schedules the optional BPO forks only partially: Osaka, BPO1 and
 	// BPO2 are configured, BPO3-BPO5 are not, and Amsterdam is scheduled after.
 	// The next fork after BPO2 must skip the unconfigured BPO forks and report
@@ -4984,7 +4977,6 @@ func TestEIP7910Config(t *testing.T) {
 		BPO1:   params.DefaultBPO1BlobConfig,
 		BPO2:   params.DefaultBPO2BlobConfig,
 	}
->>>>>>> geth-v1.17.9
 
 	var testSuite = []struct {
 		config *params.ChainConfig
@@ -5009,7 +5001,7 @@ func TestEIP7910Config(t *testing.T) {
 	}
 
 	for i, tt := range testSuite {
-		gspec := core.DefaultHoodiGenesisBlock()
+		gspec := core.DefaultBSCGenesisBlock()
 		gspec.Config = tt.config
 		backend := configTimeBackend{nil, gspec, tt.time}
 		api := NewBlockChainAPI(backend)

@@ -415,29 +415,12 @@ func (f *MemoryFreezer) TruncateTail(group string, tail uint64) (uint64, error) 
 	if prev >= tail {
 		return prev, nil
 	}
-<<<<<<< HEAD
-	for kind, table := range f.tables {
-		if slices.Contains(additionTables, kind) && table.items == 0 {
-			continue
-		}
-		if table.config.prunable {
-			if err := table.truncateTail(tail); err != nil {
-				return 0, err
-			}
-||||||| 117e067f0f
-	for _, table := range f.tables {
-		if table.config.prunable {
-			if err := table.truncateTail(tail); err != nil {
-				return 0, err
-			}
-=======
 	for _, table := range f.tables {
 		if table.config.tailGroup != group {
 			continue
 		}
 		if err := table.truncateTail(tail); err != nil {
 			return 0, err
->>>>>>> geth-v1.17.9
 		}
 	}
 	f.tails[group] = tail

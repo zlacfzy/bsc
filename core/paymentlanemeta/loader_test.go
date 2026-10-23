@@ -109,7 +109,7 @@ func TestLoadMetaReloadsWhenStateRootChanges(t *testing.T) {
 	loadMetaCache = metaCache{}
 	initial := deployedContractState(t)
 	db := initial.Database()
-	rootA, err := initial.Commit(1, false, false)
+	rootA, err := initial.Commit(params.Rules{IsEIP158: false, IsCancun: false}, 1)
 	require.NoError(t, err)
 
 	stateA, err := state.New(rootA, db)
@@ -125,7 +125,7 @@ func TestLoadMetaReloadsWhenStateRootChanges(t *testing.T) {
 	listed := common.Address{0xaa}
 	stateB.SetState(paymentlane.ContractAddress, slot(paymentContractsLenSlot), word(1))
 	stateB.SetState(paymentlane.ContractAddress, paymentContractSlot(0), common.BytesToHash(listed[:]))
-	rootB, err := stateB.Commit(2, false, false)
+	rootB, err := stateB.Commit(params.Rules{IsEIP158: false, IsCancun: false}, 2)
 	require.NoError(t, err)
 
 	stateB, err = state.New(rootB, db)
@@ -207,7 +207,7 @@ func TestPageGasStaysFarBelowTheGetterBudget(t *testing.T) {
 		}
 
 		evm := vm.NewEVM(blockContext(header), statedb, &cfg, vm.Config{NoBaseFee: true})
-		budget := vm.NewGasBudget(getterGasLimit)
+		budget := vm.NewGasBudget(getterGasLimit, 0)
 		_, left, err := evm.StaticCall(common.Address{}, paymentlane.ContractAddress, packGetPaymentContracts(0, pageSize), budget)
 		evm.Release()
 		require.NoError(t, err, tc.fork)

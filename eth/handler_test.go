@@ -286,24 +286,12 @@ func (p *testTxPool) ValidateTxBasics(_ *types.Transaction) error {
 // preinitialized with some sane testing defaults and the transaction pool mocked
 // out.
 type testHandler struct {
-<<<<<<< HEAD
 	db       ethdb.Database
 	chain    *core.BlockChain
 	txpool   *testTxPool
 	votepool *testVotePool
 	handler  *handler
-||||||| 117e067f0f
-	db      ethdb.Database
-	chain   *core.BlockChain
-	txpool  *testTxPool
-	handler *handler
-=======
-	db       ethdb.Database
-	chain    *core.BlockChain
-	txpool   *testTxPool
 	blobpool *testTxPool
-	handler  *handler
->>>>>>> geth-v1.17.9
 }
 
 // newTestHandler creates a new handler for testing purposes with no blocks.
@@ -333,12 +321,8 @@ func newTestHandlerWithBlocks(blocks int, mode ethconfig.SyncMode) *testHandler 
 		Database:   db,
 		Chain:      chain,
 		TxPool:     txpool,
-<<<<<<< HEAD
 		VotePool:   votepool,
-||||||| 117e067f0f
-=======
 		BlobPool:   txpool,
->>>>>>> geth-v1.17.9
 		Network:    1,
 		Sync:       mode,
 		BloomCache: 1,
@@ -349,10 +333,10 @@ func newTestHandlerWithBlocks(blocks int, mode ethconfig.SyncMode) *testHandler 
 	handler.Start(1000, 3)
 
 	return &testHandler{
-<<<<<<< HEAD
 		db:       db,
 		chain:    chain,
 		txpool:   txpool,
+		blobpool: txpool,
 		votepool: votepool,
 		handler:  handler,
 	}
@@ -397,7 +381,7 @@ func (c *mockParlia) FinalizeAndAssemble(chain consensus.ChainHeaderReader, head
 	c.Finalize(chain, header, state, &body.Transactions, body.Uncles, body.Withdrawals, nil, nil, nil, tracer)
 
 	// Assign the final state root to header.
-	header.Root = state.IntermediateRoot(chain.Config().IsEIP158(header.Number))
+	header.Root = state.IntermediateRoot(chain.Config().Rules(header.Number, header.Difficulty.Sign() == 0, header.Time))
 
 	// Header seems complete, assemble into a block and return
 	return types.NewBlock(header, body, receipts, trie.NewStackTrie(nil)), receipts, nil
@@ -462,20 +446,9 @@ func newTestParliaHandlerAfterCancun(t *testing.T, config *params.ChainConfig, m
 		db:       db,
 		chain:    chain,
 		txpool:   txpool,
+		blobpool: txpool,
 		votepool: votepool,
 		handler:  handler,
-||||||| 117e067f0f
-		db:      db,
-		chain:   chain,
-		txpool:  txpool,
-		handler: handler,
-=======
-		db:       db,
-		chain:    chain,
-		txpool:   txpool,
-		blobpool: txpool,
-		handler:  handler,
->>>>>>> geth-v1.17.9
 	}
 }
 
@@ -656,13 +629,7 @@ func createTestPeers(rand *rand.Rand, n int) []*ethPeer {
 		var id enode.ID
 		rand.Read(id[:])
 		p2pPeer := p2p.NewPeer(id, "test", nil)
-<<<<<<< HEAD
-		ep := eth.NewPeer(eth.ETH68, p2pPeer, nil, nil, nil)
-||||||| 117e067f0f
-		ep := eth.NewPeer(eth.ETH69, p2pPeer, nil, nil, nil)
-=======
-		ep := eth.NewPeer(eth.ETH69, p2pPeer, nil, nil, nil, nil)
->>>>>>> geth-v1.17.9
+		ep := eth.NewPeer(eth.ETH68, p2pPeer, nil, nil, nil, nil)
 		peers[i] = &ethPeer{Peer: ep}
 	}
 	return peers

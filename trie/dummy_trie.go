@@ -60,6 +60,16 @@ func (t *EmptyTrie) UpdateAccount(address common.Address, account *types.StateAc
 	return nil
 }
 
+// UpdateAccountBatch is a no-op, like UpdateAccount, in NoTries mode.
+func (t *EmptyTrie) UpdateAccountBatch(addresses []common.Address, accounts []*types.StateAccount, codeLengths []int) error {
+	return nil
+}
+
+// UpdateStorageBatch is a no-op, like UpdateStorage, in NoTries mode.
+func (t *EmptyTrie) UpdateStorageBatch(_ common.Address, keys [][]byte, values [][]byte) error {
+	return nil
+}
+
 func (t *EmptyTrie) UpdateContractCode(_ common.Address, _ common.Hash, _ []byte) error {
 	return nil
 }

@@ -60,7 +60,7 @@ func (eth *Ethereum) hashState(ctx context.Context, block *types.Block, base *st
 		// The state is available in live database, create a reference
 		// on top to prevent garbage collection and return a release
 		// function to deref it.
-		if statedb, err = eth.blockchain.StateAt(block.Root(), block.Number(), block.Time()); err == nil {
+		if statedb, err = eth.blockchain.StateAt(block.Header()); err == nil {
 			eth.blockchain.TrieDB().Reference(block.Root(), common.Hash{})
 			return statedb, func() {
 				eth.blockchain.TrieDB().Dereference(block.Root())
@@ -191,7 +191,7 @@ func (eth *Ethereum) hashState(ctx context.Context, block *types.Block, base *st
 func (eth *Ethereum) pathState(block *types.Block) (*state.StateDB, func(), error) {
 	// Check if the requested state is available in the live chain.
 	header := block.Header()
-	statedb, err := eth.blockchain.StateAt(header.Root, header.Number, header.Time)
+	statedb, err := eth.blockchain.StateAt(header)
 	if err == nil {
 		return statedb, noopReleaser, nil
 	}
@@ -293,7 +293,7 @@ func (eth *Ethereum) stateAtTransaction(ctx context.Context, block *types.Block,
 		// Assemble the transaction call message and return if the requested offset
 		msg, _ := core.TransactionToMessage(tx, signer, block.BaseFee())
 		if !beforeSystemTx {
-			msg.SkipTransactionChecks = true
+			msg.SkipEOACheck().SkipGasLimitCapCheck()
 		}
 
 		// Not yet the searched for transaction, execute on top of the current state

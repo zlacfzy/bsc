@@ -78,20 +78,10 @@ var Defaults = Config{
 	RPCGasCap:               50000000,
 	RPCEVMTimeout:           5 * time.Second,
 	GPO:                     FullNodeGPO,
-<<<<<<< HEAD
 	RPCTxFeeCap:             1,
 	TxSyncDefaultTimeout:    5 * time.Second,
 	TxSyncMaxTimeout:        10 * time.Second,
-||||||| 117e067f0f
-	RPCTxFeeCap:             1, // 1 ether
-	TxSyncDefaultTimeout:    20 * time.Second,
-	TxSyncMaxTimeout:        1 * time.Minute,
-=======
-	RPCTxFeeCap:             1, // 1 ether
 	EngineMaxReorgDepth:     32,
-	TxSyncDefaultTimeout:    20 * time.Second,
-	TxSyncMaxTimeout:        1 * time.Minute,
->>>>>>> geth-v1.17.9
 	SlowBlockThreshold:      -1, // Disabled by default; set via --debug.logslowblock flag
 	RangeLimit:              5000,
 	BlobExtraReserve:        params.DefaultExtraReserveForBlobRequests, // Extra reserve threshold for blob, blob never expires when -1 is set, default 28800
@@ -249,7 +239,6 @@ type Config struct {
 	// send-transaction variants. The unit is ether.
 	RPCTxFeeCap float64
 
-<<<<<<< HEAD
 	// OverridePassedForkTime
 	OverridePassedForkTime *uint64 `toml:",omitempty"`
 
@@ -262,18 +251,14 @@ type Config struct {
 	// OverrideFermi (TODO: remove after the fork)
 	OverrideFermi *uint64 `toml:",omitempty"`
 
-||||||| 117e067f0f
-=======
 	// EngineMaxReorgDepth is the maximum depth the chain head can be rewound
 	// to an already-canonical ancestor by engine API forkchoiceUpdated calls
 	// (0 = no limit).
 	EngineMaxReorgDepth uint64
 
->>>>>>> geth-v1.17.9
 	// OverrideOsaka (TODO: remove after the fork)
 	OverrideOsaka *uint64 `toml:",omitempty"`
 
-<<<<<<< HEAD
 	// OverrideMendel (TODO: remove after the fork)
 	OverrideMendel *uint64 `toml:",omitempty"`
 
@@ -283,12 +268,9 @@ type Config struct {
 	// OverrideJenner (TODO: remove after the fork)
 	OverrideJenner *uint64 `toml:",omitempty"`
 
-||||||| 117e067f0f
-=======
 	// OverrideAmsterdam (TODO: remove after the fork)
 	OverrideAmsterdam *uint64 `toml:",omitempty"`
 
->>>>>>> geth-v1.17.9
 	// OverrideBPO1 (TODO: remove after the fork)
 	OverrideBPO1 *uint64 `toml:",omitempty"`
 

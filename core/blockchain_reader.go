@@ -490,10 +490,9 @@ func (bc *BlockChain) ContractCodeWithPrefix(hash common.Hash) []byte {
 // State returns a new mutable state based on the current HEAD block.
 func (bc *BlockChain) State() (*state.StateDB, error) {
 	head := bc.CurrentBlock()
-	return bc.StateAt(head.Root, head.Number, head.Time)
+	return bc.StateAt(head)
 }
 
-<<<<<<< HEAD
 // StateWithCacheAt returns a new mutable state with cache based on a particular point in time.
 func (bc *BlockChain) StateWithCacheAt(root common.Hash) (*state.StateDB, error) {
 	// If there's no trie and the specified snapshot is not available, getting
@@ -529,20 +528,8 @@ func (bc *BlockChain) StateAt(header *types.Header) (*state.StateDB, error) {
 
 	if bc.chainConfig.IsUBT(header.Number, header.Time) {
 		return state.New(header.Root, state.NewUBTDatabase(bc.triedb, bc.codedb))
-||||||| 117e067f0f
-// StateAt returns a new mutable state based on a particular point in time.
-func (bc *BlockChain) StateAt(header *types.Header) (*state.StateDB, error) {
-	if bc.chainConfig.IsUBT(header.Number, header.Time) {
-		return state.New(header.Root, state.NewUBTDatabase(bc.triedb, bc.codedb))
-=======
-// StateAt returns a new mutable state with the given root, at the block with
-// the given number and time.
-func (bc *BlockChain) StateAt(root common.Hash, number *big.Int, time uint64) (*state.StateDB, error) {
-	if bc.chainConfig.IsUBT(number, time) {
-		return state.New(root, state.NewUBTDatabase(bc.triedb, bc.codedb))
->>>>>>> geth-v1.17.9
 	}
-	return state.New(root, state.NewMPTDatabase(bc.triedb, bc.codedb).WithSnapshot(bc.snaps))
+	return state.New(header.Root, state.NewMPTDatabase(bc.triedb, bc.codedb).WithSnapshot(bc.snaps))
 }
 
 // StateAtForkBoundary returns a new mutable state based on the parent state
@@ -719,7 +706,7 @@ func (bc *BlockChain) SubscribeFinalizedHeaderEvent(ch chan<- FinalizedHeaderEve
 
 // AncientTail retrieves the tail the ancients blocks
 func (bc *BlockChain) AncientTail() (uint64, error) {
-	tail, err := bc.db.Tail()
+	tail, err := bc.db.Tail(rawdb.ChainFreezerBlockDataGroup)
 	if err != nil {
 		return 0, err
 	}
@@ -734,4 +721,9 @@ func (bc *BlockChain) SubscribeNewPayloadEvent(ch chan<- NewPayloadEvent) event.
 // SendNewPayloadEvent sends a NewPayloadEvent to subscribers.
 func (bc *BlockChain) SendNewPayloadEvent(ev NewPayloadEvent) {
 	bc.newPayloadFeed.Send(ev)
+}
+
+// StateAtRoot opens state with the fork context required by the upstream API.
+func (bc *BlockChain) StateAtRoot(root common.Hash, number *big.Int, timestamp uint64) (*state.StateDB, error) {
+	return bc.StateAt(&types.Header{Root: root, Number: number, Time: timestamp})
 }

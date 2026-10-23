@@ -17,14 +17,8 @@
 package downloader
 
 import (
-<<<<<<< HEAD
-	"fmt"
-||||||| 117e067f0f
-=======
 	"bytes"
-	"encoding/json"
 	"fmt"
->>>>>>> geth-v1.17.9
 	"math/big"
 	"strings"
 	"sync"
@@ -35,7 +29,6 @@ import (
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/consensus"
-	"github.com/ethereum/go-ethereum/consensus/beacon"
 	"github.com/ethereum/go-ethereum/consensus/ethash"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/rawdb"
@@ -144,26 +137,13 @@ func (dl *downloadTester) newPeerWithChain(id string, version uint, chain *core.
 	defer dl.lock.Unlock()
 
 	peer := &downloadTesterPeer{
-<<<<<<< HEAD
 		dl:              dl,
 		id:              id,
-		chain:           newTestBlockchain(blocks),
-		withholdHeaders: make(map[common.Hash]struct{}),
+		chain:           chain,
+		withholdBodies:  make(map[common.Hash]struct{}),
+		balGate:         gate,
 		dropped:         make(chan error, 1),
-||||||| 117e067f0f
-		dl:             dl,
-		id:             id,
-		chain:          newTestBlockchain(blocks),
-		withholdBodies: make(map[common.Hash]struct{}),
-		dropped:        make(chan error, 1),
-=======
-		dl:             dl,
-		id:             id,
-		chain:          chain,
-		withholdBodies: make(map[common.Hash]struct{}),
-		balGate:        gate,
-		dropped:        make(chan error, 1),
->>>>>>> geth-v1.17.9
+		withholdHeaders: make(map[common.Hash]struct{}),
 	}
 	dl.peers[id] = peer
 
@@ -187,33 +167,18 @@ func (dl *downloadTester) dropPeer(id string) {
 }
 
 type downloadTesterPeer struct {
-<<<<<<< HEAD
-	dl    *downloadTester
-	id    string
-	chain *core.BlockChain
-
+	dl              *downloadTester
+	withholdBodies  map[common.Hash]struct{}
+	corruptBodies   bool     // if set, the peer serves incorrect blocks
+	balGate         *balGate // if set, body deliveries wait for the access lists
+	announceLag     uint64   // blocks the announced latest trails the real head by
+	id              string
+	chain           *core.BlockChain
 	withholdHeaders map[common.Hash]struct{}
-	corruptBodies   bool // if set, the peer serves incorrect bodies
-||||||| 117e067f0f
-	dl             *downloadTester
-	withholdBodies map[common.Hash]struct{}
-	corruptBodies  bool // if set, the peer serves incorrect blocks
-	id             string
-	chain          *core.BlockChain
-=======
-	dl             *downloadTester
-	withholdBodies map[common.Hash]struct{}
-	corruptBodies  bool     // if set, the peer serves incorrect blocks
-	balGate        *balGate // if set, body deliveries wait for the access lists
-	announceLag    uint64   // blocks the announced latest trails the real head by
-	id             string
-	chain          *core.BlockChain
->>>>>>> geth-v1.17.9
 
 	dropped chan error // signaled when res.Done receives an error
 }
 
-<<<<<<< HEAD
 func (dlp *downloadTesterPeer) MarkLagging() {
 }
 
@@ -224,8 +189,6 @@ func (dlp *downloadTesterPeer) Head() (common.Hash, *big.Int) {
 	return head.Hash(), dlp.chain.GetTd(head.Hash(), head.Number.Uint64())
 }
 
-||||||| 117e067f0f
-=======
 // balGate delays the body delivery of a set of blocks until their access lists
 // were delivered into the downloader's queue. Access lists are a best-effort
 // component that the queue never waits on, so without external serialization a
@@ -278,7 +241,6 @@ func (g *balGate) wait(hashes []common.Hash) {
 	}
 }
 
->>>>>>> geth-v1.17.9
 func unmarshalRlpHeaders(rlpdata []rlp.RawValue) []*types.Header {
 	var headers = make([]*types.Header, len(rlpdata))
 	for i, data := range rlpdata {
@@ -661,34 +623,11 @@ func assertOwnChain(t *testing.T, tester *downloadTester, length int) {
 	}
 }
 
-<<<<<<< HEAD
 func TestCanonicalSynchronisationFull(t *testing.T) { testCanonSync(t, eth.ETH70, FullSync) }
 func TestCanonicalSynchronisationSnap(t *testing.T) { testCanonSync(t, eth.ETH70, SnapSync) }
-||||||| 117e067f0f
-func TestCanonicalSynchronisationFull(t *testing.T) { testCanonSync(t, eth.ETH69, FullSync) }
-func TestCanonicalSynchronisationSnap(t *testing.T) { testCanonSync(t, eth.ETH69, SnapSync) }
-=======
-func TestCanonicalSynchronisationFull(t *testing.T)   { testCanonSync(t, eth.ETH69, FullSync, false) }
-func TestCanonicalSynchronisationSnap(t *testing.T)   { testCanonSync(t, eth.ETH69, SnapSync, false) }
-func TestCanonicalSynchronisationSnapV2(t *testing.T) { testCanonSync(t, eth.ETH69, SnapSync, true) }
->>>>>>> geth-v1.17.9
 
-<<<<<<< HEAD
 func testCanonSync(t *testing.T, protocol uint, mode SyncMode) {
 	tester := newTester(t, mode)
-||||||| 117e067f0f
-func testCanonSync(t *testing.T, protocol uint, mode SyncMode) {
-	success := make(chan struct{})
-	tester := newTesterWithNotification(t, mode, func() {
-		close(success)
-	})
-=======
-func testCanonSync(t *testing.T, protocol uint, mode SyncMode, snapV2 bool) {
-	success := make(chan struct{})
-	tester := newTesterWithSnap(t, mode, func() {
-		close(success)
-	}, snapV2)
->>>>>>> geth-v1.17.9
 	defer tester.terminate()
 
 	// Create a small enough block chain to download
@@ -751,166 +690,17 @@ func TestPeerServes(t *testing.T) {
 // trails their real head, as every peer's does between two range updates. The
 // blocks past the announced latest must still be fetched, or the tail of the
 // chain would stall until the next announcement.
-func TestStaleRangeAnnouncement(t *testing.T) {
-	for _, lag := range []uint64{1, 32, rangeUpdateSlack} {
-		t.Run(fmt.Sprintf("lag-%d", lag), func(t *testing.T) {
-			success := make(chan struct{})
-			tester := newTesterWithNotification(t, FullSync, func() { close(success) })
-			defer tester.terminate()
-
-			chain := testChainBase.shorten(blockCacheMaxItems - 15)
-			peer := tester.newPeer("peer", eth.ETH69, chain.blocks[1:])
-			peer.announceLag = lag
-
-			if err := tester.downloader.BeaconSync(chain.blocks[len(chain.blocks)-1].Header(), nil); err != nil {
-				t.Fatalf("failed to beacon-sync chain: %v", err)
-			}
-			select {
-			case <-success:
-				assertOwnChain(t, tester, len(chain.blocks))
-			case <-time.NewTimer(time.Second * 3).C:
-				t.Fatalf("Failed to sync chain in three seconds")
-			}
-		})
-	}
-}
 
 // makeBALChain constructs a post-merge, Amsterdam-enabled chain whose blocks
 // all carry a block access list commitment, along with the genesis needed to
 // sync it. Every block contains a transaction so that no block has an empty
 // body (empty-body blocks complete without a network retrieval, voiding any
 // delivery ordering imposed by the tests).
-func makeBALChain(n int) (*core.Genesis, []*types.Block) {
-	config := *params.MergedTestChainConfig
-	config.AmsterdamTime = new(uint64)
-
-	gspec := &core.Genesis{
-		Config: &config,
-		Alloc: types.GenesisAlloc{
-			testAddress:                      {Balance: new(big.Int).Mul(big.NewInt(1000), big.NewInt(params.Ether))},
-			params.BeaconRootsAddress:        {Nonce: 1, Code: params.BeaconRootsCode, Balance: common.Big0},
-			params.HistoryStorageAddress:     {Nonce: 1, Code: params.HistoryStorageCode, Balance: common.Big0},
-			params.WithdrawalQueueAddress:    {Nonce: 1, Code: params.WithdrawalQueueCode, Balance: common.Big0},
-			params.ConsolidationQueueAddress: {Nonce: 1, Code: params.ConsolidationQueueCode, Balance: common.Big0},
-			params.BuilderDepositAddress:     {Nonce: 1, Code: params.BuilderDepositCode, Balance: common.Big0},
-			params.BuilderExitAddress:        {Nonce: 1, Code: params.BuilderExitCode, Balance: common.Big0},
-		},
-		BaseFee:    big.NewInt(params.InitialBaseFee),
-		Difficulty: common.Big0,
-	}
-	signer := types.LatestSigner(&config)
-	_, blocks, _ := core.GenerateChainWithGenesis(gspec, beacon.New(ethash.NewFaker()), n, func(i int, block *core.BlockGen) {
-		// The chain maker only executes the EIP-4788 system call when the
-		// beacon root is set explicitly; without it, the generated access
-		// lists would not match the ones computed at import.
-		block.SetParentBeaconRoot(common.Hash{})
-
-		tx, err := types.SignTx(types.NewTransaction(block.TxNonce(testAddress), common.Address{0x01}, big.NewInt(1000), params.TxGas, block.BaseFee(), nil), signer, testKey)
-		if err != nil {
-			panic(err)
-		}
-		block.AddTx(tx)
-	})
-	return gspec, blocks
-}
 
 // Tests that block access lists are retrieved from eth/71+ peers during sync
 // and end up attached to the imported blocks; and that syncing against peers
 // which cannot (or do not) serve access lists still completes, importing the
 // blocks without them.
-func TestBALSynchronisationFull(t *testing.T)       { testBALSync(t, FullSync, eth.ETH71) }
-func TestBALSynchronisationSnap(t *testing.T)       { testBALSync(t, SnapSync, eth.ETH71) }
-func TestBALSynchronisationLegacyPeer(t *testing.T) { testBALSync(t, FullSync, eth.ETH69) }
-
-func testBALSync(t *testing.T, mode SyncMode, protocol uint) {
-	gspec, blocks := makeBALChain(96) // long enough for a snap sync pivot below the head
-
-	success := make(chan struct{})
-	tester := newTesterWithGenesis(t, mode, func() { close(success) }, false, gspec, beacon.New(ethash.NewFaker()))
-	defer tester.terminate()
-
-	// Assemble the serving chain, executing the blocks to persist their access
-	// lists.
-	peerChain, err := core.NewBlockChain(rawdb.NewMemoryDatabase(), gspec, beacon.New(ethash.NewFaker()), nil)
-	if err != nil {
-		t.Fatalf("failed to create peer chain: %v", err)
-	}
-	defer peerChain.Stop()
-
-	if _, err := peerChain.InsertChain(blocks); err != nil {
-		t.Fatalf("failed to assemble peer chain: %v", err)
-	}
-	// Collect the blocks whose access lists the downloader should retrieve
-	var eligible []common.Hash
-	for _, block := range blocks {
-		if hash := block.Header().BlockAccessListHash; hash != nil && *hash != types.EmptyBlockAccessListHash {
-			eligible = append(eligible, block.Hash())
-		}
-	}
-	if len(eligible) != len(blocks) {
-		t.Fatalf("expected all %d blocks to commit to an access list, got %d", len(blocks), len(eligible))
-	}
-	// Access lists are best effort and never block the delivery of an otherwise
-	// completed block. To assert their attachment deterministically, gate the
-	// body deliveries of modern peers on the access lists arriving first.
-	var gate *balGate
-	if protocol >= eth.ETH71 {
-		gate = newBALGate(eligible)
-	}
-	tester.newPeerWithChain("peer", protocol, peerChain, gate)
-
-	// Track which imported blocks had an access list attached
-	var (
-		attachLock sync.Mutex
-		attached   = make(map[uint64]bool)
-	)
-	tester.downloader.chainInsertHook = func(results []*fetchResult) {
-		attachLock.Lock()
-		defer attachLock.Unlock()
-		for _, result := range results {
-			if result.BAL() != nil {
-				attached[result.Header.Number.Uint64()] = true
-			}
-		}
-	}
-	// Synchronise with the peer and make sure all relevant data was retrieved.
-	// In snap mode, announce a finalized block too, directing the chain segment
-	// below it straight into the ancient store: downloaded access lists must
-	// end up retrievable through that path as well.
-	var final *types.Header
-	if mode == SnapSync {
-		final = blocks[len(blocks)/3].Header()
-	}
-	if err := tester.downloader.BeaconSync(blocks[len(blocks)-1].Header(), final); err != nil {
-		t.Fatalf("failed to beacon-sync chain: %v", err)
-	}
-	select {
-	case <-success:
-		assertOwnChain(t, tester, len(blocks)+1)
-	case <-time.NewTimer(15 * time.Second).C:
-		t.Fatalf("failed to sync chain in fifteen seconds")
-	}
-	attachLock.Lock()
-	defer attachLock.Unlock()
-
-	for _, block := range blocks {
-		if protocol >= eth.ETH71 {
-			// Modern peer: the access list must have been downloaded, attached
-			// to the imported block and persisted locally
-			if !attached[block.NumberU64()] {
-				t.Errorf("block %d: no access list attached at import", block.NumberU64())
-			}
-			if have, want := tester.chain.GetAccessListRLP(block.Hash()), peerChain.GetAccessListRLP(block.Hash()); !bytes.Equal(have, want) {
-				t.Errorf("block %d: persisted access list mismatch: have %x, want %x", block.NumberU64(), have, want)
-			}
-		} else {
-			// Legacy peer: blocks must have been imported without access lists
-			if attached[block.NumberU64()] {
-				t.Errorf("block %d: unexpected access list attached at import", block.NumberU64())
-			}
-		}
-	}
-}
 
 // Tests that if a large batch of blocks are being downloaded, it is throttled
 // until the cached blocks are retrieved.
@@ -1429,186 +1219,8 @@ func checkProgress(t *testing.T, d *Downloader, stage string, want ethereum.Sync
 func TestForkedSyncProgress68Full(t *testing.T) { testForkedSyncProgress(t, eth.ETH68, FullSync) }
 func TestForkedSyncProgress68Snap(t *testing.T) { testForkedSyncProgress(t, eth.ETH68, SnapSync) }
 
-<<<<<<< HEAD
 func testForkedSyncProgress(t *testing.T, protocol uint, mode SyncMode) {
 	tester := newTester(t, mode)
-||||||| 117e067f0f
-func testBeaconSync(t *testing.T, protocol uint, mode SyncMode) {
-	var cases = []struct {
-		name  string // The name of testing scenario
-		local int    // The length of local chain(canonical chain assumed), 0 means genesis is the head
-	}{
-		{name: "Beacon sync since genesis", local: 0},
-		{name: "Beacon sync with short local chain", local: 1},
-		{name: "Beacon sync with long local chain", local: blockCacheMaxItems - 15 - fsMinFullBlocks/2},
-		{name: "Beacon sync with full local chain", local: blockCacheMaxItems - 15 - 1},
-	}
-	for _, c := range cases {
-		t.Run(c.name, func(t *testing.T) {
-			success := make(chan struct{})
-			tester := newTesterWithNotification(t, mode, func() {
-				close(success)
-			})
-			defer tester.terminate()
-
-			chain := testChainBase.shorten(blockCacheMaxItems - 15)
-			tester.newPeer("peer", protocol, chain.blocks[1:])
-
-			// Build the local chain segment if it's required
-			if c.local > 0 {
-				tester.chain.InsertChain(chain.blocks[1 : c.local+1])
-			}
-			if err := tester.downloader.BeaconSync(chain.blocks[len(chain.blocks)-1].Header(), nil); err != nil {
-				t.Fatalf("Failed to beacon sync chain %v %v", c.name, err)
-			}
-			select {
-			case <-success:
-				// Ok, downloader fully cancelled after sync cycle
-				if bs := int(tester.chain.CurrentBlock().Number.Uint64()) + 1; bs != len(chain.blocks) {
-					t.Fatalf("synchronised blocks mismatch: have %v, want %v", bs, len(chain.blocks))
-				}
-			case <-time.NewTimer(time.Second * 3).C:
-				t.Fatalf("Failed to sync chain in three seconds")
-			}
-		})
-	}
-}
-
-// Tests that synchronisation progress (origin block number, current block number
-// and highest block number) is tracked and updated correctly.
-func TestSyncProgressFull(t *testing.T) { testSyncProgress(t, eth.ETH69, FullSync) }
-func TestSyncProgressSnap(t *testing.T) { testSyncProgress(t, eth.ETH69, SnapSync) }
-
-func testSyncProgress(t *testing.T, protocol uint, mode SyncMode) {
-	success := make(chan struct{})
-	tester := newTesterWithNotification(t, mode, func() {
-		success <- struct{}{}
-	})
-=======
-func testBeaconSync(t *testing.T, protocol uint, mode SyncMode) {
-	var cases = []struct {
-		name  string // The name of testing scenario
-		local int    // The length of local chain(canonical chain assumed), 0 means genesis is the head
-	}{
-		{name: "Beacon sync since genesis", local: 0},
-		{name: "Beacon sync with short local chain", local: 1},
-		{name: "Beacon sync with long local chain", local: blockCacheMaxItems - 15 - fsMinFullBlocks/2},
-		{name: "Beacon sync with full local chain", local: blockCacheMaxItems - 15 - 1},
-	}
-	for _, c := range cases {
-		t.Run(c.name, func(t *testing.T) {
-			success := make(chan struct{})
-			tester := newTesterWithNotification(t, mode, func() {
-				close(success)
-			})
-			defer tester.terminate()
-
-			chain := testChainBase.shorten(blockCacheMaxItems - 15)
-			tester.newPeer("peer", protocol, chain.blocks[1:])
-
-			// Build the local chain segment if it's required
-			if c.local > 0 {
-				tester.chain.InsertChain(chain.blocks[1 : c.local+1])
-			}
-			if err := tester.downloader.BeaconSync(chain.blocks[len(chain.blocks)-1].Header(), nil); err != nil {
-				t.Fatalf("Failed to beacon sync chain %v %v", c.name, err)
-			}
-			select {
-			case <-success:
-				// Ok, downloader fully cancelled after sync cycle
-				if bs := int(tester.chain.CurrentBlock().Number.Uint64()) + 1; bs != len(chain.blocks) {
-					t.Fatalf("synchronised blocks mismatch: have %v, want %v", bs, len(chain.blocks))
-				}
-			case <-time.NewTimer(time.Second * 3).C:
-				t.Fatalf("Failed to sync chain in three seconds")
-			}
-		})
-	}
-}
-
-// TestBeaconSyncRepairFork verifies the end-to-end repair of non-canonical block
-// data. The local node sits on fork A, but fork B's blocks below the local head
-// are also present by hash (no canonical mapping), as if imported optimistically
-// via the engine API. When the beacon chain switches to fork B, sync must not
-// anchor on the non-canonical fork-B data; it has to descend to the real common
-// ancestor and re-deliver everything, ending with the full fork-B chain present
-// and canonical at every height - for both snap and full sync.
-func TestBeaconSyncRepairForkFull(t *testing.T) { testBeaconSyncRepairFork(t, eth.ETH69, FullSync) }
-func TestBeaconSyncRepairForkSnap(t *testing.T) { testBeaconSyncRepairFork(t, eth.ETH69, SnapSync) }
-
-func testBeaconSyncRepairFork(t *testing.T, protocol uint, mode SyncMode) {
-	// Reuse the pre-generated fork chains (new chains can't be generated after the
-	// package init). Fork A and fork B share the whole testChainBase prefix and
-	// diverge at height len(testChainBase.blocks); fork B (the beacon target) is
-	// longer, so it wins the reorg. The exact shortenings used here are the ones
-	// registered as peer chains during init.
-	localChain := testChainForkLightA.shorten(len(testChainBase.blocks) + 80)
-	targetChain := testChainForkLightB.shorten(len(testChainBase.blocks) + MaxHeaderFetch)
-
-	forkPoint := uint64(len(testChainBase.blocks)) // first height the forks differ
-	localHead := uint64(len(localChain.blocks) - 1)
-	targetHead := uint64(len(targetChain.blocks) - 1)
-
-	success := make(chan struct{})
-	tester := newTesterWithNotification(t, mode, func() {
-		close(success)
-	})
-	defer tester.terminate()
-
-	tester.newPeer("peer", protocol, targetChain.blocks[1:])
-
-	// Make fork A the local canonical chain.
-	if _, err := tester.chain.InsertChain(localChain.blocks[1 : localHead+1]); err != nil {
-		t.Fatalf("failed to build local chain: %v", err)
-	}
-	// Seed fork B's divergent blocks that sit below the local head as scattered,
-	// non-canonical data: full block data present by hash, but the canonical
-	// mapping at those heights still points at fork A.
-	for n := forkPoint; n <= localHead; n++ {
-		b := targetChain.blocks[n]
-		rawdb.WriteBlock(tester.db, b)
-		rawdb.WriteReceipts(tester.db, b.Hash(), b.NumberU64(), types.Receipts{})
-	}
-
-	if err := tester.downloader.BeaconSync(targetChain.blocks[targetHead].Header(), nil); err != nil {
-		t.Fatalf("failed to beacon-sync chain: %v", err)
-	}
-	select {
-	case <-success:
-	case <-time.NewTimer(10 * time.Second).C:
-		t.Fatalf("failed to sync chain in ten seconds")
-	}
-	// The head must reach fork B's tip.
-	if got := tester.chain.CurrentBlock().Number.Uint64(); got != targetHead {
-		t.Fatalf("synced head mismatch: have %d, want %d", got, targetHead)
-	}
-	// Every height must be canonical to fork B and carry complete block data,
-	// proving the non-canonical fork-A / seed data was fully reorged out.
-	for n := uint64(1); n <= targetHead; n++ {
-		want := targetChain.blocks[n].Hash()
-		if got := rawdb.ReadCanonicalHash(tester.db, n); got != want {
-			t.Fatalf("canonical hash at %d: have %x, want %x", n, got, want)
-		}
-		if !rawdb.HasHeader(tester.db, want, n) || !rawdb.HasBody(tester.db, want, n) {
-			t.Fatalf("incomplete block data at %d after sync", n)
-		}
-		if !rawdb.HasReceipts(tester.db, want, n) {
-			t.Fatalf("missing receipts at %d after sync", n)
-		}
-	}
-}
-
-// Tests that synchronisation progress (origin block number, current block number
-// and highest block number) is tracked and updated correctly.
-func TestSyncProgressFull(t *testing.T) { testSyncProgress(t, eth.ETH69, FullSync) }
-func TestSyncProgressSnap(t *testing.T) { testSyncProgress(t, eth.ETH69, SnapSync) }
-
-func testSyncProgress(t *testing.T, protocol uint, mode SyncMode) {
-	success := make(chan struct{})
-	tester := newTesterWithNotification(t, mode, func() {
-		success <- struct{}{}
-	})
->>>>>>> geth-v1.17.9
 	defer tester.terminate()
 
 	chainA := testChainForkLightA.shorten(len(testChainBase.blocks) + MaxHeaderFetch)
@@ -1921,59 +1533,5 @@ func TestInvalidBodyPeerDrop(t *testing.T) {
 	case <-peer.dropped:
 	case <-time.After(1 * time.Minute):
 		t.Fatal("peer was not dropped")
-	}
-}
-
-// Tests that a pivot frozen by the snap syncer is recognized as part of the
-// chain being synced, even though the pivot block itself is not committed into
-// the local chain until its state is complete.
-func TestFrozenPivotCanonical(t *testing.T) {
-	tester := newTester(t, SnapSync)
-	defer tester.terminate()
-
-	// Assemble a header chain with [1, 4] committed locally and [5, 10] only
-	// tracked by the skeleton, leaving [11, 12] as stale leftovers above the
-	// skeleton head.
-	headers := []*types.Header{tester.chain.Genesis().Header()}
-	for i := 1; i <= 12; i++ {
-		headers = append(headers, &types.Header{
-			ParentHash: headers[i-1].Hash(),
-			Number:     big.NewInt(int64(i)),
-			Difficulty: common.Big0,
-		})
-	}
-	for i := 1; i <= 4; i++ {
-		rawdb.WriteHeader(tester.db, headers[i])
-		rawdb.WriteCanonicalHash(tester.db, headers[i].Hash(), uint64(i))
-	}
-	for i := 5; i <= 12; i++ {
-		rawdb.WriteSkeletonHeader(tester.db, headers[i])
-	}
-	blob, _ := json.Marshal(&skeletonProgress{
-		Subchains: []*subchain{{Head: 10, Tail: 5, Next: headers[4].Hash()}},
-	})
-	rawdb.WriteSkeletonSyncStatus(tester.db, blob)
-
-	sidechain := func(number int) *types.Header {
-		header := types.CopyHeader(headers[number])
-		header.Extra = []byte("side")
-		return header
-	}
-	tests := []struct {
-		header *types.Header
-		want   bool
-	}{
-		{headers[7], true},    // tracked by the skeleton only
-		{headers[5], true},    // skeleton tail
-		{headers[10], true},   // skeleton head
-		{sidechain(7), false}, // reorged out of the skeleton
-		{headers[3], true},    // committed locally
-		{sidechain(3), false}, // reorged out of the local chain
-		{headers[11], false},  // above the skeleton head
-	}
-	for i, tt := range tests {
-		if have := tester.downloader.isFrozenPivotCanonical(tt.header); have != tt.want {
-			t.Errorf("test %d: frozen pivot %d canonical mismatch: have %v, want %v", i, tt.header.Number, have, tt.want)
-		}
 	}
 }

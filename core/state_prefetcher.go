@@ -59,22 +59,11 @@ func (p *statePrefetcher) EnableMevMode() {
 // Prefetch processes the state changes according to the Ethereum rules by running
 // the transaction messages using the statedb, but any changes are discarded. The
 // only goal is to warm the state caches.
-<<<<<<< HEAD
-func (p *statePrefetcher) Prefetch(transactions types.Transactions, header *types.Header, gasLimit uint64, statedb *state.StateDB, cfg vm.Config, interrupt *atomic.Bool) {
-||||||| 117e067f0f
-func (p *statePrefetcher) Prefetch(block *types.Block, statedb *state.StateDB, cfg vm.Config, interrupt *atomic.Bool) {
-=======
 func (p *statePrefetcher) Prefetch(block *types.Block, statedb *state.StateDB, jumpDestCache vm.JumpDestCache, precompileCache *vm.PrecompileCache, cfg vm.Config, interrupt *atomic.Bool, execIndex *atomic.Int64) {
->>>>>>> geth-v1.17.9
 	var (
 		fails   atomic.Int64
-<<<<<<< HEAD
-||||||| 117e067f0f
-		header  = block.Header()
-=======
 		skips   atomic.Int64
 		header  = block.Header()
->>>>>>> geth-v1.17.9
 		signer  = types.MakeSigner(p.config, header.Number, header.Time)
 		workers errgroup.Group
 		reader  = statedb.Reader()
@@ -83,14 +72,8 @@ func (p *statePrefetcher) Prefetch(block *types.Block, statedb *state.StateDB, j
 	workers.SetLimit(max(1, 3*runtime.NumCPU()/5)) // Aggressively run the prefetching
 
 	// Iterate over and process the individual transactions
-<<<<<<< HEAD
-	for i, tx := range transactions {
-||||||| 117e067f0f
-	for i, tx := range block.Transactions() {
-=======
 	for _, n := range prefetchOrder(txs) {
 		i, tx := n, txs[n]
->>>>>>> geth-v1.17.9
 		stateCpy := statedb.Copy() // closure
 		workers.Go(func() error {
 			// If block precaching was interrupted, abort
@@ -151,7 +134,7 @@ func (p *statePrefetcher) Prefetch(block *types.Block, statedb *state.StateDB, j
 
 			// We attempt to apply a transaction. The goal is not to execute
 			// the transaction successfully, rather to warm up touched data slots.
-			if _, err := ApplyMessage(evm, msg, nil); err != nil {
+			if _, err := ApplyMessage(evm, msg, NewGasPool(block.GasLimit())); err != nil {
 				fails.Add(1)
 				return nil // Ugh, something went horribly wrong, bail out
 			}
@@ -160,18 +143,11 @@ func (p *statePrefetcher) Prefetch(block *types.Block, statedb *state.StateDB, j
 	}
 	workers.Wait()
 
-<<<<<<< HEAD
-	blockPrefetchTxsValidMeter.Mark(int64(len(transactions)) - fails.Load())
-||||||| 117e067f0f
-	blockPrefetchTxsValidMeter.Mark(int64(len(block.Transactions())) - fails.Load())
-=======
 	blockPrefetchTxsValidMeter.Mark(int64(len(txs)) - fails.Load() - skips.Load())
->>>>>>> geth-v1.17.9
 	blockPrefetchTxsInvalidMeter.Mark(fails.Load())
 	blockPrefetchTxsSkippedMeter.Mark(skips.Load())
 	return
 }
-<<<<<<< HEAD
 
 // PrefetchMining processes the state changes according to the Ethereum rules by running
 // the transaction messages using the statedb, but any changes are discarded. The
@@ -196,6 +172,7 @@ func (p *statePrefetcher) PrefetchMining(txs TransactionsByPriceAndNonce, header
 		go func(startCh <-chan *types.Transaction, stopCh <-chan struct{}) {
 			newStatedb := statedb.Copy()
 			evm := vm.NewEVM(NewEVMBlockContext(header, p.chain, nil), newStatedb, p.config, cfg)
+			defer evm.Release()
 			idx := 0
 			// Iterate over and process the individual transactions
 			for {
@@ -230,10 +207,10 @@ func (p *statePrefetcher) PrefetchMining(txs TransactionsByPriceAndNonce, header
 						continue // Skip invalid tx from txpool
 					}
 					// Disable the nonce check
-					msg.SkipNonceChecks = true
+					msg.SkipNonceCheck()
 
 					idx++
-					newStatedb.SetTxContext(tx.Hash(), idx)
+					newStatedb.SetTxContext(tx.Hash(), idx, uint32(idx+1))
 					ApplyMessage(evm, msg, NewGasPool(gasLimit))
 
 				case <-stopCh:
@@ -270,8 +247,6 @@ func (p *statePrefetcher) PrefetchMining(txs TransactionsByPriceAndNonce, header
 		}
 	}(txs)
 }
-||||||| 117e067f0f
-=======
 
 // prefetchPromoteGas is the gas limit above which a transaction is promoted
 // to the front of the prefetch queue. Below it the worker pool keeps up with
@@ -295,4 +270,3 @@ func prefetchOrder(txs types.Transactions) []int {
 	})
 	return order
 }
->>>>>>> geth-v1.17.9

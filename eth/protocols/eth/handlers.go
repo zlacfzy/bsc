@@ -611,7 +611,11 @@ func handleReceipts[L ReceiptsList](backend Backend, msg Decoder, peer *Peer) er
 	if err != nil {
 		return fmt.Errorf("Receipts: %w", err)
 	}
-<<<<<<< HEAD
+	for i, list := range receiptLists {
+		if n := (*ReceiptList68)(list).items.Len(); n*minReceiptEncodedSize > len((*ReceiptList68)(list).items.Content()) {
+			return fmt.Errorf("Receipts: list %d: impossible receipt count %d", i, n)
+		}
+	}
 	buffers := new(receiptListBuffers)
 	for i := range receiptLists {
 		receiptLists[i].setBuffers(buffers)
@@ -638,15 +642,6 @@ func handleReceipts[L ReceiptsList](backend Backend, msg Decoder, peer *Peer) er
 		code: ReceiptsMsg,
 		Res:  &enc,
 	}, metadata)
-||||||| 117e067f0f
-
-	return dispatchReceipts(res.RequestId, receiptLists, peer)
-=======
-	if err := checkReceiptItemCounts(receiptLists); err != nil {
-		return fmt.Errorf("Receipts: %w", err)
-	}
-	return dispatchReceipts(res.RequestId, receiptLists, peer)
->>>>>>> geth-v1.17.9
 }
 
 func handleReceipts70(backend Backend, msg Decoder, peer *Peer) error {

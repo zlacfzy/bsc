@@ -38,16 +38,9 @@ const (
 // memory and disk IO. If the args don't set --datadir, the
 // child g gets a temporary data directory.
 func runMinimalGeth(t *testing.T, args ...string) *testgeth {
-	// --hoodi to make the 'writing genesis to disk' faster (no accounts)
-	// --networkid=1337 to avoid cache bump
+	// Use the BSC Chapel genesis with its test network ID.
 	// --syncmode=full to avoid allocating fast sync bloom
-<<<<<<< HEAD
 	allArgs := []string{"--chapel", "--networkid", "97", "--syncmode=full", "--port", "0",
-||||||| 117e067f0f
-	allArgs := []string{"--holesky", "--networkid", "1337", "--authrpc.port", "0", "--syncmode=full", "--port", "0",
-=======
-	allArgs := []string{"--hoodi", "--networkid", "1337", "--authrpc.port", "0", "--syncmode=full", "--port", "0",
->>>>>>> geth-v1.17.9
 		"--nat", "none", "--nodiscover", "--maxpeers", "0", "--cache", "64",
 		"--datadir.minfreedisk", "0"}
 	return runGeth(t, append(allArgs, args...)...)
@@ -59,7 +52,7 @@ func TestConsoleWelcome(t *testing.T) {
 	t.Parallel()
 
 	// Start a geth console, make sure it's cleaned up and terminate the console
-	geth := runMinimalGeth(t, "console")
+	geth := runMinimalGeth(t, "--miner.etherbase", "0x8605cdbbdb6d264aa742e77020dcbc58fcdce182", "console")
 
 	// Gather all the infos the welcome message needs to contain
 	geth.SetTemplateFunc("goos", func() string { return runtime.GOOS })
@@ -67,13 +60,7 @@ func TestConsoleWelcome(t *testing.T) {
 	geth.SetTemplateFunc("gover", runtime.Version)
 	geth.SetTemplateFunc("gethver", func() string { return version.WithCommit("", "") })
 	geth.SetTemplateFunc("niltime", func() string {
-<<<<<<< HEAD
 		return time.Unix(0x5e9da7ce, 0).Format("Mon Jan 02 2006 15:04:05 GMT-0700 (MST)")
-||||||| 117e067f0f
-		return time.Unix(1695902100, 0).Format("Mon Jan 02 2006 15:04:05 GMT-0700 (MST)")
-=======
-		return time.Unix(1742212800, 0).Format("Mon Jan 02 2006 15:04:05 GMT-0700 (MST)")
->>>>>>> geth-v1.17.9
 	})
 	geth.SetTemplateFunc("apis", func() string { return ipcAPIs })
 
@@ -110,7 +97,7 @@ func TestAttachWelcome(t *testing.T) {
 	p := trulyRandInt(1024, 65533) // Yeah, sometimes this will fail, sorry :P
 	httpPort = strconv.Itoa(p)
 	wsPort = strconv.Itoa(p + 1)
-	geth := runMinimalGeth(t,
+	geth := runMinimalGeth(t, "--miner.etherbase", "0x8605cdbbdb6d264aa742e77020dcbc58fcdce182",
 		"--ipcpath", ipc,
 		"--http", "--http.port", httpPort,
 		"--ws", "--ws.port", wsPort)
@@ -144,13 +131,7 @@ func testAttachWelcome(t *testing.T, geth *testgeth, endpoint, apis string) {
 	attach.SetTemplateFunc("gethver", func() string { return version.WithCommit("", "") })
 	attach.SetTemplateFunc("etherbase", func() string { return geth.Etherbase })
 	attach.SetTemplateFunc("niltime", func() string {
-<<<<<<< HEAD
 		return time.Unix(0x5e9da7ce, 0).Format("Mon Jan 02 2006 15:04:05 GMT-0700 (MST)")
-||||||| 117e067f0f
-		return time.Unix(1695902100, 0).Format("Mon Jan 02 2006 15:04:05 GMT-0700 (MST)")
-=======
-		return time.Unix(1742212800, 0).Format("Mon Jan 02 2006 15:04:05 GMT-0700 (MST)")
->>>>>>> geth-v1.17.9
 	})
 	attach.SetTemplateFunc("ipc", func() bool { return strings.HasPrefix(endpoint, "ipc") })
 	attach.SetTemplateFunc("datadir", func() string { return geth.Datadir })

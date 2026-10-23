@@ -1463,7 +1463,7 @@ func (c *mockParlia) FinalizeAndAssemble(chain consensus.ChainHeaderReader, head
 	c.Finalize(chain, header, state, &body.Transactions, body.Uncles, body.Withdrawals, nil, nil, nil, tracer)
 
 	// Assign the final state root to header.
-	header.Root = state.IntermediateRoot(chain.Config().IsEIP158(header.Number))
+	header.Root = state.IntermediateRoot(chain.Config().Rules(header.Number, header.Difficulty.Sign() == 0, header.Time))
 
 	// Header seems complete, assemble into a block and return
 	return types.NewBlock(header, body, receipts, trie.NewStackTrie(nil)), receipts, nil

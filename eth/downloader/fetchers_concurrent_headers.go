@@ -95,3 +95,9 @@ func (q *headerQueue) deliver(peer *peerConnection, packet *eth.Response) (int, 
 	}
 	return accepted, err
 }
+
+// Headers are served independently of the peer's advertised body range.
+func (q *headerQueue) next() (uint64, bool)         { return 0, false }
+func (q *headerQueue) requeue(peer string)          { q.unreserve(peer) }
+func (q *headerQueue) stalled(time.Duration) string { return "" }
+func (q *headerQueue) metrics() *fetchMetrics       { return headerFetchMetrics }

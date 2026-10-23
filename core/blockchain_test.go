@@ -40,12 +40,8 @@ import (
 	"github.com/ethereum/go-ethereum/consensus"
 	"github.com/ethereum/go-ethereum/consensus/beacon"
 	"github.com/ethereum/go-ethereum/consensus/ethash"
-<<<<<<< HEAD
 	"github.com/ethereum/go-ethereum/consensus/misc/eip4844"
-||||||| 117e067f0f
-=======
 	"github.com/ethereum/go-ethereum/core/history"
->>>>>>> geth-v1.17.9
 	"github.com/ethereum/go-ethereum/core/rawdb"
 	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/core/tracing"
@@ -185,14 +181,8 @@ func testBlockChainImport(chain types.Blocks, blockchain *BlockChain) error {
 		if err != nil {
 			return err
 		}
-<<<<<<< HEAD
 		statedb.SetExpectedStateRoot(block.Root())
-		res, err := blockchain.processor.Process(context.Background(), block, statedb, vm.Config{})
-||||||| 117e067f0f
-		res, err := blockchain.processor.Process(context.Background(), block, statedb, vm.Config{})
-=======
 		res, err := blockchain.processor.Process(context.Background(), block, statedb, nil, nil, vm.Config{}, nil)
->>>>>>> geth-v1.17.9
 		if err != nil {
 			blockchain.reportBadBlock(block, res, err)
 			return err
@@ -3987,7 +3977,7 @@ func TestTransientStorageReset(t *testing.T) {
 	}
 	// Check the storage
 	head := chain.CurrentHeader()
-	state, err := chain.StateAt(head.Root, head.Number, head.Time)
+	state, err := chain.StateAt(head)
 	if err != nil {
 		t.Fatalf("Failed to load state %v", err)
 	}
@@ -4149,7 +4139,7 @@ func (c *mockParlia) FinalizeAndAssemble(chain consensus.ChainHeaderReader, head
 	c.Finalize(chain, header, state, &body.Transactions, body.Uncles, body.Withdrawals, nil, nil, nil, tracer)
 
 	// Assign the final state root to header.
-	header.Root = state.IntermediateRoot(chain.Config().IsEIP158(header.Number))
+	header.Root = state.IntermediateRoot(chain.Config().Rules(header.Number, header.Difficulty.Sign() == 0, header.Time))
 
 	// Header seems complete, assemble into a block and return
 	return types.NewBlock(header, body, receipts, trie.NewStackTrie(nil)), receipts, nil
@@ -4965,7 +4955,7 @@ func testRestartDuringInterruptedHeadersBeforeCutoff(t *testing.T, disk bool) {
 	// Replay the next batch up to its tail truncation: the headers are in the
 	// ancient store and the head markers point at the last of them, but the
 	// block data tail is still where the previous batch left it.
-	if _, err := rawdb.WriteAncientHeaderChain(db, headers[16:24]); err != nil {
+	if _, err := rawdb.WriteAncientHeaderChain(db, headers[16:24], new(big.Int)); err != nil {
 		t.Fatalf("failed to write headers to ancient store: %v", err)
 	}
 	batch := db.NewBatch()

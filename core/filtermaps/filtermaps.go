@@ -461,9 +461,6 @@ func (f *FilterMaps) init() error {
 		}}
 		localBase = true
 		log.Info("Starting log index at history cutoff with a local log value index base", "block", f.historyCutoff)
-		if f.exportFileName != "" {
-			log.Warn("Log index checkpoints cannot be exported from a local log value index base")
-		}
 	}
 	if initBlockNumber < f.targetView.headNumber {
 		// genesis block still exists even after pruning

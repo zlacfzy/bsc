@@ -91,11 +91,11 @@ func recordLanes(into map[uint64]laneRecord, gen func(int, *BlockGen)) func(int,
 func laneRequiredTxGas(t testing.TB, config *params.ChainConfig, data []byte) uint64 {
 	t.Helper()
 	rules := config.Rules(common.Big1, false, 1)
-	cost, err := IntrinsicGas(data, nil, nil, false, rules.IsHomestead, rules.IsIstanbul, rules.IsShanghai, rules.IsAmsterdam)
+	cost, err := IntrinsicGas(data, nil, nil, common.Address{}, &common.Address{}, nil, rules)
 	require.NoError(t, err)
-	gas := cost.RegularGas
+	gas := cost
 	if rules.IsPrague {
-		floor, err := FloorDataGas(rules, data, nil)
+		floor, err := FloorDataGas(rules, common.Address{}, &common.Address{}, nil, data, nil)
 		require.NoError(t, err)
 		if floor > gas {
 			gas = floor

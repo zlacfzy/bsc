@@ -143,24 +143,11 @@ var (
 )
 
 var genesis = &core.Genesis{
-<<<<<<< HEAD
 	Config: params.AllEthashProtocolChanges, // AllDevChainProtocolChanges,
 	Alloc: types.GenesisAlloc{
 		testAddr:           {Balance: testBalance},
 		revertContractAddr: {Code: revertCode},
 	},
-||||||| 117e067f0f
-	Config: params.AllDevChainProtocolChanges,
-	Alloc: types.GenesisAlloc{
-		testAddr:           {Balance: testBalance},
-		revertContractAddr: {Code: revertCode},
-	},
-=======
-	Config: params.AllDevChainProtocolChanges,
-	// The config activates every fork from genesis, so the system contracts it
-	// calls into have to be deployed for the chain to be valid.
-	Alloc:     genesisAlloc(),
->>>>>>> geth-v1.17.9
 	ExtraData: []byte("test genesis"),
 	Timestamp: 9000,
 	BaseFee:   big.NewInt(params.InitialBaseFeeForBSC),

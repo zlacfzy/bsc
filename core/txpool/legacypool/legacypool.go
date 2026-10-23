@@ -133,7 +133,7 @@ type BlockChain interface {
 	GetBlock(hash common.Hash, number uint64) *types.Block
 
 	// StateAt returns a state database for a given chain header (generally the head).
-	StateAt(root common.Hash, number *big.Int, time uint64) (*state.StateDB, error)
+	StateAt(head *types.Header) (*state.StateDB, error)
 }
 
 // Config are the configuration parameters of the transaction pool.
@@ -317,19 +317,7 @@ func (pool *LegacyPool) Init(gasTip uint64, head *types.Header, reserver txpool.
 	// Initialize the state with head block, or fallback to empty one in
 	// case the head state is not available (might occur when node is not
 	// fully synced).
-<<<<<<< HEAD
-	statedb, err := pool.chain.StateAt(head)
-	if err != nil {
-		statedb, err = pool.chain.StateAt(&types.Header{Number: head.Number, Time: head.Time, Root: types.EmptyRootHash})
-	}
-||||||| 117e067f0f
-	statedb, err := pool.chain.StateAt(head)
-	if err != nil {
-		statedb, err = pool.chain.StateAt(pool.chain.Genesis().Header())
-	}
-=======
 	statedb, err := txpool.HeadState(pool.chainconfig, pool.chain.StateAt, head)
->>>>>>> geth-v1.17.9
 	if err != nil {
 		return err
 	}
@@ -1412,7 +1400,7 @@ func (pool *LegacyPool) reset(oldHead, newHead *types.Header) {
 	if newHead == nil {
 		newHead = pool.chain.CurrentBlock() // Special case during testing
 	}
-	statedb, err := pool.chain.StateAt(newHead.Root, newHead.Number, newHead.Time)
+	statedb, err := pool.chain.StateAt(newHead)
 	if err != nil {
 		log.Error("Failed to reset txpool state", "err", err)
 		return

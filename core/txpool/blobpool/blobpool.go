@@ -179,9 +179,7 @@ func (ptx *BlobTxForPool) sidecar() (*types.BlobTxSidecar, error) {
 
 // txSize returns the network size of the transaction without reconstructing it.
 //
-// The blobpool only holds v1 (cell-proof) sidecars: legacy v0 sidecars are no longer
-// accepted into the pool, nor served over the wire protocol. The size therefore assumes
-// the v1 wire form [tx, version, blobs, commitments, proofs].
+// BSC keeps the v0 wire form without a version field; v1 includes it.
 func (ptx *BlobTxForPool) txSize() uint64 {
 	sidecar := ptx.CellSidecar
 
@@ -195,16 +193,17 @@ func (ptx *BlobTxForPool) txSize() uint64 {
 	var blob kzg4844.Blob
 	blobs := uint64(len(sidecar.Commitments)) * rlp.BytesSize(blob[:])
 
-	version := uint64(rlp.IntSize(uint64(sidecar.Version)))
+	var version uint64
+	if sidecar.Version != types.BlobSidecarVersion0 {
+		version = uint64(rlp.IntSize(uint64(sidecar.Version)))
+	}
 	return ptx.Tx.Size() + rlp.ListSize(version+rlp.ListSize(blobs)+rlp.ListSize(commitments)+rlp.ListSize(proofs))
 }
 
 // txSizeWithoutBlob returns the eth/72 network size, where the blob payload is dropped
 // to an empty list and fetched separately via GetCells.
 //
-// Like txSize, this assumes the v1 wire form: only v1 sidecars live in the pool (v0 is
-// no longer accepted or served), so the version byte is always present, only the blob
-// payload becomes an empty list [tx, version, [], commitments, proofs].
+// As in txSize, v0 omits the version field.
 func (ptx *BlobTxForPool) txSizeWithoutBlob() uint64 {
 	sidecar := ptx.CellSidecar
 
@@ -215,7 +214,10 @@ func (ptx *BlobTxForPool) txSizeWithoutBlob() uint64 {
 	for i := range sidecar.Proofs {
 		proofs += rlp.BytesSize(sidecar.Proofs[i][:])
 	}
-	version := uint64(rlp.IntSize(uint64(sidecar.Version)))
+	var version uint64
+	if sidecar.Version != types.BlobSidecarVersion0 {
+		version = uint64(rlp.IntSize(uint64(sidecar.Version)))
+	}
 	return ptx.Tx.Size() + rlp.ListSize(version+rlp.ListSize(0)+rlp.ListSize(commitments)+rlp.ListSize(proofs))
 }
 
@@ -297,7 +299,7 @@ func encodeForNetwork(storedRLP []byte, version uint) ([]byte, error) {
 
 	// 3. Find the version of sidecar.
 	sidecarVersion, _, err := rlp.SplitUint64(sidecarElems[0])
-	if err != nil || sidecarVersion > 255 || sidecarVersion == 0 {
+	if err != nil || sidecarVersion > 255 {
 		return nil, fmt.Errorf("invalid version: %w", err)
 	}
 
@@ -332,7 +334,10 @@ func encodeForNetwork(storedRLP []byte, version uint) ([]byte, error) {
 	}
 
 	// 6. Reconstruct into the network format.
-	outer := [][]byte{txRLP, sidecarElems[0], blobsField, commitmentsRLP, proofsRLP}
+	outer := [][]byte{txRLP, blobsField, commitmentsRLP, proofsRLP}
+	if sidecarVersion != uint64(types.BlobSidecarVersion0) {
+		outer = [][]byte{txRLP, sidecarElems[0], blobsField, commitmentsRLP, proofsRLP}
+	}
 	body, err := rlp.MergeListValues(outer)
 	if err != nil {
 		return nil, err
@@ -691,19 +696,7 @@ func (p *BlobPool) Init(gasTip uint64, head *types.Header, reserver txpool.Reser
 	// Initialize the state with head block, or fallback to empty one in
 	// case the head state is not available (might occur when node is not
 	// fully synced).
-<<<<<<< HEAD
-	state, err := p.chain.StateAt(head)
-	if err != nil {
-		state, err = p.chain.StateAt(&types.Header{Number: head.Number, Time: head.Time, Root: types.EmptyRootHash})
-	}
-||||||| 117e067f0f
-	state, err := p.chain.StateAt(head)
-	if err != nil {
-		state, err = p.chain.StateAt(p.chain.Genesis().Header())
-	}
-=======
 	state, err := txpool.HeadState(p.chain.Config(), p.chain.StateAt, head)
->>>>>>> geth-v1.17.9
 	if err != nil {
 		return err
 	}
@@ -1271,7 +1264,7 @@ func (p *BlobPool) Reset(oldHead, newHead *types.Header) {
 	// Handle reorg buffer timeouts evicting old gapped transactions
 	p.evictGapped()
 
-	statedb, err := p.chain.StateAt(newHead.Root, newHead.Number, newHead.Time)
+	statedb, err := p.chain.StateAt(newHead)
 	if err != nil {
 		log.Error("Failed to reset blobpool state", "err", err)
 		return
@@ -1538,25 +1531,9 @@ func (p *BlobPool) reinject(addr common.Address, txhash common.Hash) error {
 	// A reorged-out legacy blob transaction can therefore not be re-added, so drop
 	// it on the floor instead of putting it back.
 	head := p.head.Load()
-<<<<<<< HEAD
-	if p.chain.Config().IsOsaka(head.Number, head.Time) && tx.BlobTxSidecar().Version == types.BlobSidecarVersion0 && p.chain.Config().IsNotInBSC() {
-		if err := tx.BlobTxSidecar().ToV1(); err != nil {
-			log.Error("Failed to convert the legacy sidecar", "err", err)
-			return err
-		}
-		log.Info("Legacy blob transaction is reorged", "hash", tx.Hash())
-||||||| 117e067f0f
-	if p.chain.Config().IsOsaka(head.Number, head.Time) && tx.BlobTxSidecar().Version == types.BlobSidecarVersion0 {
-		if err := tx.BlobTxSidecar().ToV1(); err != nil {
-			log.Error("Failed to convert the legacy sidecar", "err", err)
-			return err
-		}
-		log.Info("Legacy blob transaction is reorged", "hash", tx.Hash())
-=======
-	if p.chain.Config().IsOsaka(head.Number, head.Time) && ptx.CellSidecar.Version == types.BlobSidecarVersion0 {
+	if p.chain.Config().IsNotInBSC() && p.chain.Config().IsOsaka(head.Number, head.Time) && ptx.CellSidecar.Version == types.BlobSidecarVersion0 {
 		log.Debug("Dropping reorged legacy blob transaction", "hash", txhash)
 		return errors.New("legacy blob sidecar unsupported post-osaka")
->>>>>>> geth-v1.17.9
 	}
 	blob, err := rlp.EncodeToBytes(ptx)
 	if err != nil {
@@ -2113,11 +2090,13 @@ func (p *BlobPool) Add(txs []*types.Transaction, sync bool) []error {
 			errs[i] = err
 			continue
 		}
-		if err := txpool.ValidateCells(ptx.CellSidecar); err != nil {
-			errs[i] = err
-			continue
+		if p.chain.Config().IsNotInBSC() {
+			if err := txpool.ValidateCells(ptx.CellSidecar); err != nil {
+				errs[i] = err
+				continue
+			}
 		}
-		errs[i] = p.AddPooledTx(ptx)
+		errs[i] = p.addPooledTx(ptx)
 	}
 	return errs
 }
@@ -2125,6 +2104,24 @@ func (p *BlobPool) Add(txs []*types.Transaction, sync bool) []error {
 // AddPooledTx inserts a new blob transaction into the pool if it passes
 // validation (both consensus validity and pool restrictions).
 func (p *BlobPool) AddPooledTx(ptx *BlobTxForPool) (err error) {
+	// BSC accepts full v0 sidecars only. The cell ingress path must enforce
+	// the same proof and transaction checks as direct submission.
+	if p.chain.Config().IsInBSC() {
+		if ptx == nil || ptx.CellSidecar == nil || ptx.CellSidecar.Version != types.BlobSidecarVersion0 || ptx.CellSidecar.Custody != types.CustodyBitmapAll {
+			return errors.New("BSC requires a complete v0 blob sidecar")
+		}
+		tx, err := ptx.toTx()
+		if err != nil {
+			return err
+		}
+		if err := p.ValidateTxBasics(tx); err != nil {
+			return err
+		}
+	}
+	return p.addPooledTx(ptx)
+}
+
+func (p *BlobPool) addPooledTx(ptx *BlobTxForPool) (err error) {
 	// The blob pool blocks on adding a transaction. This is because blob txs are
 	// only even pulled from the network, so this method will act as the overload
 	// protection for fetches.

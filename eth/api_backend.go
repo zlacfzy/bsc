@@ -45,12 +45,8 @@ import (
 	"github.com/ethereum/go-ethereum/eth/tracers"
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/event"
-<<<<<<< HEAD
-	"github.com/ethereum/go-ethereum/miner"
-||||||| 117e067f0f
-=======
 	"github.com/ethereum/go-ethereum/internal/ethapi"
->>>>>>> geth-v1.17.9
+	"github.com/ethereum/go-ethereum/miner"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/rpc"
 )
@@ -265,7 +261,7 @@ func (b *EthAPIBackend) StateAndHeaderByNumber(ctx context.Context, number rpc.B
 	if header == nil {
 		return nil, nil, errors.New("header not found")
 	}
-	stateDb, err := b.eth.BlockChain().StateAt(header.Root, header.Number, header.Time)
+	stateDb, err := b.eth.BlockChain().StateAt(header)
 	if err != nil {
 		stateDb, err = b.eth.BlockChain().HistoricState(header.Root, header.Number, header.Time)
 		if err != nil {
@@ -290,7 +286,7 @@ func (b *EthAPIBackend) StateAndHeaderByNumberOrHash(ctx context.Context, blockN
 		if blockNrOrHash.RequireCanonical && b.eth.blockchain.GetCanonicalHash(header.Number.Uint64()) != hash {
 			return nil, nil, errors.New("hash is not currently canonical")
 		}
-		stateDb, err := b.eth.BlockChain().StateAt(header.Root, header.Number, header.Time)
+		stateDb, err := b.eth.BlockChain().StateAt(header)
 		if err != nil {
 			stateDb, err = b.eth.BlockChain().HistoricState(header.Root, header.Number, header.Time)
 			if err != nil {
@@ -498,13 +494,10 @@ func (b *EthAPIBackend) FeeHistory(ctx context.Context, blockCount uint64, lastB
 	return b.gpo.FeeHistory(ctx, blockCount, lastBlock, rewardPercentiles)
 }
 
-<<<<<<< HEAD
 func (b *EthAPIBackend) Chain() *core.BlockChain {
 	return b.eth.BlockChain()
 }
 
-||||||| 117e067f0f
-=======
 func (b *EthAPIBackend) BaseFee(ctx context.Context) *big.Int {
 	header := b.CurrentHeader()
 	next := new(big.Int).Add(header.Number, common.Big1)
@@ -514,7 +507,6 @@ func (b *EthAPIBackend) BaseFee(ctx context.Context) *big.Int {
 	return nil
 }
 
->>>>>>> geth-v1.17.9
 func (b *EthAPIBackend) BlobBaseFee(ctx context.Context) *big.Int {
 	if excess := b.CurrentHeader().ExcessBlobGas; excess != nil {
 		return eip4844.CalcBlobFee(b.ChainConfig(), b.CurrentHeader())

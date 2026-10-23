@@ -468,3 +468,8 @@ func trienodeHistoryIndexBlockKey(addressHash common.Hash, path []byte, blockID 
 func transitionStateKey(hash common.Hash) []byte {
 	return append(VerkleTransitionStatePrefix, hash.Bytes()...)
 }
+
+// skeletonHeaderKey addresses headers used by snap/2 catch-up.
+func skeletonHeaderKey(number uint64) []byte {
+	return append([]byte("S"), encodeBlockNumber(number)...)
+}

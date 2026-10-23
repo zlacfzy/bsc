@@ -56,17 +56,16 @@ const (
 	// the assumption that the gas limit is 60M.
 	maxAccessListRequestCount = 28
 
-	// maxCatchUpBlocks is the maximum gap (in blocks) that BAL catch-up is
+	// params.FullImmutabilityThreshold is the maximum gap (in blocks) that BAL catch-up is
 	// allowed to span. BALs are only retained by peers for a limited window
 	// (roughly two weeks, ~100k blocks at 12s block time). If the pivot has
 	// moved further than this conservative bound, the BALs needed to roll the
 	// flat state forward are likely no longer available, so we discard the
 	// stale progress and restart the sync from scratch rather than attempting
 	// a catch-up that is bound to fail partway through.
-	maxCatchUpBlocks = params.FullImmutabilityThreshold
 
 	// catchUpWindow is the number of blocks BAL catch-up fetches and applies at
-	// a time. The whole gap can span up to maxCatchUpBlocks, so fetching it in
+	// a time. The whole gap can span up to params.FullImmutabilityThreshold, so fetching it in
 	// one shot would buffer every block's BAL (~100 KiB each) in memory before
 	// applying any. Processing the gap in bounded windows caps peak memory to a
 	// single window's worth of BALs.
@@ -613,7 +612,7 @@ func (s *syncerV2) Sync(target *types.Header, cancel chan struct{}) error {
 			// lists required for catch-up are almost certainly unavailable from
 			// peers, so discard the stale progress and resync from scratch
 			// instead of starting a catch-up doomed to stall.
-			log.Warn("Catch-up gap exceeds BAL retention, restarting snap sync from scratch", "oldnumber", prevPivot.Number, "newnumber", target.Number, "gap", new(big.Int).Sub(target.Number, prevPivot.Number), "limit", maxCatchUpBlocks)
+			log.Warn("Catch-up gap exceeds BAL retention, restarting snap sync from scratch", "oldnumber", prevPivot.Number, "newnumber", target.Number, "gap", new(big.Int).Sub(target.Number, prevPivot.Number), "limit", params.FullImmutabilityThreshold)
 			s.resetSyncState()
 
 		case s.isPivotReorged(prevPivot, target):
@@ -835,7 +834,7 @@ func (s *syncerV2) isPivotReorged(prev, curr *types.Header) bool {
 // so the caller should wipe and resync from scratch instead.
 func catchUpExceedsRetention(prev, curr *types.Header) bool {
 	gap := new(big.Int).Sub(curr.Number, prev.Number)
-	return gap.Cmp(big.NewInt(maxCatchUpBlocks)) > 0
+	return gap.Cmp(new(big.Int).SetUint64(params.FullImmutabilityThreshold)) > 0
 }
 
 // catchUp runs the BAL catch-up. When the pivot has moved, it fetches BALs

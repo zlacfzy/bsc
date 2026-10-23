@@ -34,8 +34,8 @@ import (
 
 // HeadState returns the state of the given head, or an empty state if that is
 // not available, which happens while the node is not fully synced.
-func HeadState(config *params.ChainConfig, stateAt func(common.Hash, *big.Int, uint64) (*state.StateDB, error), head *types.Header) (*state.StateDB, error) {
-	statedb, err := stateAt(head.Root, head.Number, head.Time)
+func HeadState(config *params.ChainConfig, stateAt func(*types.Header) (*state.StateDB, error), head *types.Header) (*state.StateDB, error) {
+	statedb, err := stateAt(head)
 	if err == nil {
 		return statedb, nil
 	}
@@ -43,7 +43,7 @@ func HeadState(config *params.ChainConfig, stateAt func(common.Hash, *big.Int, u
 	if config.IsUBT(head.Number, head.Time) {
 		root = types.EmptyBinaryHash
 	}
-	return stateAt(root, head.Number, head.Time)
+	return stateAt(&types.Header{Root: root, Number: head.Number, Time: head.Time})
 }
 
 // TxStatus is the current status of a transaction as seen by the pool.
@@ -69,7 +69,7 @@ type BlockChain interface {
 	SubscribeChainHeadEvent(ch chan<- core.ChainHeadEvent) event.Subscription
 
 	// StateAt returns a state database for a given chain header (generally the head).
-	StateAt(root common.Hash, number *big.Int, time uint64) (*state.StateDB, error)
+	StateAt(head *types.Header) (*state.StateDB, error)
 }
 
 // TxPool is an aggregator for various transaction specific pools, collectively
@@ -105,19 +105,7 @@ func New(gasTip uint64, chain BlockChain, subpools []SubPool) (*TxPool, error) {
 	// Initialize the state with head block, or fallback to empty one in
 	// case the head state is not available (might occur when node is not
 	// fully synced).
-<<<<<<< HEAD
-	statedb, err := chain.StateAt(head)
-	if err != nil {
-		statedb, err = chain.StateAt(&types.Header{Number: head.Number, Time: head.Time, Root: types.EmptyRootHash})
-	}
-||||||| 117e067f0f
-	statedb, err := chain.StateAt(head)
-	if err != nil {
-		statedb, err = chain.StateAt(chain.Genesis().Header())
-	}
-=======
 	statedb, err := HeadState(chain.Config(), chain.StateAt, head)
->>>>>>> geth-v1.17.9
 	if err != nil {
 		return nil, err
 	}
@@ -210,7 +198,7 @@ func (p *TxPool) loop(head *types.Header) {
 			case resetBusy <- struct{}{}:
 				// Updates the statedb with the new chain head. The head state may be
 				// unavailable if the initial state sync has not yet completed.
-				if statedb, err := p.chain.StateAt(newHead.Root, newHead.Number, newHead.Time); err != nil {
+				if statedb, err := p.chain.StateAt(newHead); err != nil {
 					log.Error("Failed to reset txpool state", "err", err)
 				} else {
 					p.stateLock.Lock()

@@ -99,6 +99,13 @@ func (api *DebugAPI) ReplayBadBlock(ctx context.Context, hash common.Hash) (map[
 func (api *DebugAPI) replayBuild(ctx context.Context, block *types.Block, statedb *state.StateDB, reverted []*rawdb.RevertedTx) (*bal.BlockAccessList, types.Receipts, uint64, common.Hash, error) {
 	bc := api.eth.blockchain
 	config := bc.Config()
+	// TODO(BSC): Adapt build replay to Parlia system-transaction execution,
+	// system-contract upgrades and payment-lane accounting, including reverted
+	// build attempts. Verify gas, receipts, state root and BAL against the BSC
+	// build/import paths before removing this guard.
+	if config.IsInBSC() {
+		return nil, nil, 0, common.Hash{}, fmt.Errorf("build replay is not supported for BSC system transactions")
+	}
 
 	parent := bc.GetHeader(block.ParentHash(), block.NumberU64()-1)
 	if parent == nil {
@@ -193,7 +200,10 @@ func (api *DebugAPI) replayBuild(ctx context.Context, block *types.Block, stated
 		Transactions: committed,
 		Withdrawals:  block.Withdrawals(),
 	}
-	bc.Engine().Finalize(bc, header, statedb, &body)
+	usedGas := gp.Used()
+	if err := bc.Engine().Finalize(bc, header, statedb, &body.Transactions, body.Uncles, body.Withdrawals, (*[]*types.Receipt)(&receipts), nil, &usedGas, nil); err != nil {
+		return nil, nil, 0, common.Hash{}, err
+	}
 	root := statedb.IntermediateRoot(evm.GetRules())
 
 	return blockAL.ToEncodingObj(), receipts, gp.Used(), root, nil

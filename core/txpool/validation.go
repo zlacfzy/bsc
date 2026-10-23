@@ -162,13 +162,10 @@ func ValidateTransaction(tx *types.Transaction, head *types.Header, signer types
 		return fmt.Errorf("%w: gas tip cap %v, minimum needed %v", ErrTxGasPriceTooLow, tx.GasTipCap(), opts.MinTip)
 	}
 	if tx.Type() == types.BlobTxType {
-<<<<<<< HEAD
-		return ValidateBlobTx(tx, head, opts)
-||||||| 117e067f0f
-		return validateBlobTx(tx, head, opts)
-=======
+		if opts.Config.IsInBSC() {
+			return ValidateBlobTx(tx, head, opts)
+		}
 		return validateBlobSidecar(tx, head, opts)
->>>>>>> geth-v1.17.9
 	}
 	if tx.Type() == types.SetCodeTxType {
 		if len(tx.SetCodeAuthorizations()) == 0 {
@@ -178,27 +175,13 @@ func ValidateTransaction(tx *types.Transaction, head *types.Header, signer types
 	return nil
 }
 
-<<<<<<< HEAD
 // ValidateBlobTx validates blob-transaction specific fields including sidecar
 // commitment hashes and KZG proofs.
 func ValidateBlobTx(tx *types.Transaction, head *types.Header, opts *ValidationOptions) error {
-||||||| 117e067f0f
-// validateBlobTx implements the blob-transaction specific validations.
-func validateBlobTx(tx *types.Transaction, head *types.Header, opts *ValidationOptions) error {
-=======
-// validateBlobSidecar implements the blob sidecar validation.
-// Note that this doesn't verify the consistency between blobs(cells) and
-// proofs. For proof verification, use validateCells.
-func validateBlobSidecar(tx *types.Transaction, head *types.Header, opts *ValidationOptions) error {
-	if tx.BlobGasFeeCapIntCmp(blobTxMinBlobGasPrice) < 0 {
-		return fmt.Errorf("%w: blob fee cap %v, minimum needed %v", ErrTxGasPriceTooLow, tx.BlobGasFeeCap(), blobTxMinBlobGasPrice)
-	}
->>>>>>> geth-v1.17.9
 	sidecar := tx.BlobTxSidecar()
 	if sidecar == nil {
 		return errors.New("missing sidecar in blob transaction")
 	}
-<<<<<<< HEAD
 	// Ensure the sidecar is constructed with the correct version, consistent
 	// with the current fork.
 	version := types.BlobSidecarVersion0
@@ -214,24 +197,60 @@ func validateBlobSidecar(tx *types.Transaction, head *types.Header, opts *Valida
 	}
 	// Ensure the number of items in the blob transaction and various side
 	// data match up before doing any expensive validations
-||||||| 117e067f0f
-	// Ensure the sidecar is constructed with the correct version, consistent
-	// with the current fork.
-	version := types.BlobSidecarVersion0
-	if opts.Config.IsOsaka(head.Number, head.Time) {
-		version = types.BlobSidecarVersion1
+	hashes := tx.BlobHashes()
+	if len(hashes) == 0 {
+		return errors.New("blobless blob transaction")
 	}
-	if sidecar.Version != version {
-		return fmt.Errorf("unexpected sidecar version, want: %d, got: %d", version, sidecar.Version)
+	if len(hashes) > params.BlobTxMaxBlobs {
+		return fmt.Errorf("too many blobs in transaction: have %d, permitted %d", len(hashes), params.BlobTxMaxBlobs)
 	}
-	// Ensure the blob fee cap satisfies the minimum blob gas price
+	if len(sidecar.Blobs) != len(hashes) {
+		return fmt.Errorf("invalid number of %d blobs compared to %d blob hashes", len(sidecar.Blobs), len(hashes))
+	}
+	if err := sidecar.ValidateBlobCommitmentHashes(hashes); err != nil {
+		return err
+	}
+	// Fork-specific sidecar checks, including proof verification.
+	if sidecar.Version == types.BlobSidecarVersion1 {
+		return validateBlobSidecarOsaka(sidecar, hashes)
+	} else {
+		return validateBlobSidecarLegacy(sidecar, hashes)
+	}
+}
+
+func validateBlobSidecarLegacy(sidecar *types.BlobTxSidecar, hashes []common.Hash) error {
+	if len(sidecar.Proofs) != len(hashes) {
+		return fmt.Errorf("invalid number of %d blob proofs expected %d", len(sidecar.Proofs), len(hashes))
+	}
+	for i := range sidecar.Blobs {
+		if err := kzg4844.VerifyBlobProof(&sidecar.Blobs[i], sidecar.Commitments[i], sidecar.Proofs[i]); err != nil {
+			return fmt.Errorf("%w: invalid blob proof: %v", ErrKZGVerificationError, err)
+		}
+	}
+	return nil
+}
+
+func validateBlobSidecarOsaka(sidecar *types.BlobTxSidecar, hashes []common.Hash) error {
+	if len(sidecar.Proofs) != len(hashes)*kzg4844.CellProofsPerBlob {
+		return fmt.Errorf("invalid number of %d blob proofs expected %d", len(sidecar.Proofs), len(hashes)*kzg4844.CellProofsPerBlob)
+	}
+	if err := kzg4844.VerifyCellProofs(sidecar.Blobs, sidecar.Commitments, sidecar.Proofs); err != nil {
+		return fmt.Errorf("%w: %v", ErrKZGVerificationError, err)
+	}
+	return nil
+}
+
+// validateBlobSidecar implements the blob sidecar validation.
+// Note that this doesn't verify the consistency between blobs(cells) and
+// proofs. For proof verification, use validateCells.
+func validateBlobSidecar(tx *types.Transaction, head *types.Header, opts *ValidationOptions) error {
 	if tx.BlobGasFeeCapIntCmp(blobTxMinBlobGasPrice) < 0 {
 		return fmt.Errorf("%w: blob fee cap %v, minimum needed %v", ErrTxGasPriceTooLow, tx.BlobGasFeeCap(), blobTxMinBlobGasPrice)
 	}
-	// Ensure the number of items in the blob transaction and various side
-	// data match up before doing any expensive validations
-=======
->>>>>>> geth-v1.17.9
+	sidecar := tx.BlobTxSidecar()
+	if sidecar == nil {
+		return errors.New("missing sidecar in blob transaction")
+	}
 	hashes := tx.BlobHashes()
 	if err := sidecar.ValidateBlobCommitmentHashes(hashes); err != nil {
 		return err

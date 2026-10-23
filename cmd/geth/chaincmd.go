@@ -74,14 +74,10 @@ var (
 			utils.OverrideMaxwell,
 			utils.OverrideFermi,
 			utils.OverrideOsaka,
-<<<<<<< HEAD
 			utils.OverrideMendel,
 			utils.OverridePasteur,
 			utils.OverrideJenner,
-||||||| 117e067f0f
-=======
 			utils.OverrideAmsterdam,
->>>>>>> geth-v1.17.9
 			utils.OverrideBPO1,
 			utils.OverrideBPO2,
 			utils.OverrideUBT,
@@ -371,7 +367,6 @@ func initGenesis(ctx *cli.Context) error {
 		v := ctx.Uint64(utils.OverrideOsaka.Name)
 		overrides.OverrideOsaka = &v
 	}
-<<<<<<< HEAD
 	if ctx.IsSet(utils.OverrideMendel.Name) {
 		v := ctx.Uint64(utils.OverrideMendel.Name)
 		overrides.OverrideMendel = &v
@@ -384,13 +379,10 @@ func initGenesis(ctx *cli.Context) error {
 		v := ctx.Uint64(utils.OverrideJenner.Name)
 		overrides.OverrideJenner = &v
 	}
-||||||| 117e067f0f
-=======
 	if ctx.IsSet(utils.OverrideAmsterdam.Name) {
 		v := ctx.Uint64(utils.OverrideAmsterdam.Name)
 		overrides.OverrideAmsterdam = &v
 	}
->>>>>>> geth-v1.17.9
 	if ctx.IsSet(utils.OverrideBPO1.Name) {
 		v := ctx.Uint64(utils.OverrideBPO1.Name)
 		overrides.OverrideBPO1 = &v
@@ -948,22 +940,8 @@ func importHistory(ctx *cli.Context) error {
 		switch {
 		case ctx.Bool(utils.BSCMainnetFlag.Name):
 			network = "mainnet"
-<<<<<<< HEAD
 		case ctx.Bool(utils.ChapelFlag.Name):
 			network = "chapel"
-||||||| 117e067f0f
-		case ctx.Bool(utils.SepoliaFlag.Name):
-			network = "sepolia"
-		case ctx.Bool(utils.HoleskyFlag.Name):
-			network = "holesky"
-		case ctx.Bool(utils.HoodiFlag.Name):
-			network = "hoodi"
-=======
-		case ctx.Bool(utils.SepoliaFlag.Name):
-			network = "sepolia"
-		case ctx.Bool(utils.HoodiFlag.Name):
-			network = "hoodi"
->>>>>>> geth-v1.17.9
 		}
 	} else {
 		// No network flag set, try to determine network based on files
@@ -1301,16 +1279,6 @@ func downloadEra(ctx *cli.Context) error {
 	var network = "mainnet"
 	if utils.IsNetworkPreset(ctx) {
 		switch {
-<<<<<<< HEAD
-||||||| 117e067f0f
-		case ctx.IsSet(utils.MainnetFlag.Name):
-		case ctx.IsSet(utils.SepoliaFlag.Name):
-			network = "sepolia"
-=======
-		case ctx.Bool(utils.MainnetFlag.Name):
-		case ctx.Bool(utils.SepoliaFlag.Name):
-			network = "sepolia"
->>>>>>> geth-v1.17.9
 		default:
 			return errors.New("unsupported network, no known era1 checksums")
 		}
